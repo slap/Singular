@@ -136,3 +136,4 @@ helpfiles
 *.npy
 .coverage
 *.pyc
+Singular/LIB/.singularhistory
