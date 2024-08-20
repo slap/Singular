@@ -263,6 +263,7 @@ EXAMPLE: example normal; shows an example
         }
         if(isMonic == 0)
         {
+          "Not monic.";
           intVar = 2;
           M = coef(f, intVar);
           poly mapBack = x;
@@ -272,13 +273,14 @@ EXAMPLE: example normal; shows an example
             f = subst(f, x, x + y);
             mapBack = subst(mapBack, x, x - y);
             M = coef(f, var(2));
+            f = f / M[2,1];  // In case the leading coefficient is not 1.
           }
         }
         // We now have a monic polynomial and we can compute the integral basis.
         if(in_array(#, "atOrigin")) {
-          list out = integralBasis(f, intVar, "atOrigin");
+          list out = integralBasis(f, intVar, "atOrigin", "opti0");  // The optimization algorithm is not implemented when the expansions have common rational part.
         } else {
-          list out = integralBasis(f, intVar);
+          list out = integralBasis(f, intVar, "opti0");  // The optimization algorithm is not implemented when the expansions have common rational part.
         }
 
         // If we applied some transformation, we apply it back.

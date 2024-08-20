@@ -76,6 +76,9 @@ proc optimAlgorithm(int n, int locBasis, int d0, int d1, intvec vxy, matrix M, l
   poly y = var(2);
   int slD = vxy[1];
 
+  "optimAlgorithm";
+  ~;
+  
   if(blocks[size(blocks)] != size(blocks)) // More than one class in a block
   {
     //proc MBlocks(list classes, matrix M, list MSelf, list bF, list blocks, list I2LiftedFull)  
