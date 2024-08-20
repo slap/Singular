@@ -1,7 +1,7 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-version="version puiseuxexpansion.lib 4.3.1.0 Jul_2022 "; // $Id$
+version="$Id$";
 category="Commutative Algebra";
 info="
 LIBRARY:  puiseuxexpansion.lib  Puiseux expansions over algebraic extensions
@@ -63,7 +63,6 @@ static proc extendBaseringPuiseux(Puiseux P, def S)
 static proc substPuiseux(Puiseux f, int idx, Puiseux g)
 {
   if (idx==1){ERROR("First variable is used for Puiseux series coefficients");}
-
   def R = basering;
   def S = f.in;
   setring S;
@@ -89,30 +88,24 @@ static proc substPuiseux(Puiseux f, int idx, Puiseux g)
   ffh = subst(ffh,var(idx),gg);
   kill ff;
   kill gg;
-
   setring S;
   kill ff;
   kill gg;
-
   poly ffh = fetch(S2,ffh);
   Puiseux F;
   F.in = S;
-
   F.numer = ffh;
   kill ffh;
-
   F.denom = fd*gd^dg;
   kill fd;
   kill gd;
   kill dg;
-
   F.fraction = lcmfr;
   kill lcmfr;
-
   setring R;
-
   return(F);
 }
+
 
 proc makePuiseuxFromPoly(poly f)
 "USAGE: makePuiseuxFromPoly(f); f polynomial in two variables
@@ -128,6 +121,45 @@ example
  poly f=3*x^2+x+1;
  makePuiseuxFromPoly(f);
 }
+
+
+proc classToPuiseux(cl)
+{
+  Puiseux F;
+  if(typeof(cl) == "list")
+  {
+    F = listToPuiseux(cl);
+  } else 
+  {
+    F = ringToPuiseux(cl);
+  }
+  return(F);
+}
+
+proc listToPuiseux(PE)
+{
+  def R = basering;
+  Puiseux F;
+  F.in=basering;
+  F.numer=PE[1];
+  F.denom = 1;
+  F.fraction = PE[2];
+  return(F);
+}
+
+proc ringToPuiseux(S)
+{
+  def R = basering;
+  setring S;
+  Puiseux F;
+  F.in=basering;
+  F.numer=PE[1][1];
+  F.denom = 1;
+  F.fraction = PE[1][2];
+  setring R;
+  return(F);
+}
+
 
 proc makePuiseux(poly f, poly denom, int fr)
 "USAGE: makePuiseux(f, denom, fr); f polynomial in two variables, denom polynomial in
@@ -171,7 +203,6 @@ example
  poly f=3*x^2+x*y+1;
  Puiseux F = makePuiseux(f,x^2,3);
  printPuiseux(F);
-
 }
 
 // Sum of two Puiseux elements
@@ -271,14 +302,11 @@ EXAMPLE: example puiseux, shows an example"
 {
   if(atOrigin == 1)
   {
-    list p = puiseuxMainOneExpansion(f, maxDeg, 0, 1, 1);
-    //list p = puiseuxMain(f, maxDeg, 0, 1, 1);
+    list p = puiseuxMain(f, maxDeg, 0, 1, 1);
   } else
   {
-    list p = puiseuxMainOneExpansion(f, maxDeg, 0, 0, 1);
-    //list p = puiseuxMain(f, maxDeg, 0, 0, 1);
+    list p = puiseuxMain(f, maxDeg, 0, 0, 1);
   }
-
   return(p);
 }
 example
@@ -295,13 +323,15 @@ example
 // slD is the denominator
 static proc puiseuxStep(poly f, int slN, int slD){
   def R = basering;
+  poly x = var(1);
+  poly y = var(2);
 
   // We treat the negative exponents separately
-  poly f2 = subst(f, var(1), var(1)^slD);
+  poly f2 = subst(f, x, x^slD);
   if(slN >= 0)
   {
-    poly f3 = subst(f2, var(2), var(2)*(var(1)^slN));
-    matrix M = coef(f3,var(1));
+    poly f3 = subst(f2, y, y*(x^slN));
+    matrix M = coef(f3,x);
     poly c = M[2, ncols(M)];
   } else
   {
@@ -312,8 +342,7 @@ static proc puiseuxStep(poly f, int slN, int slD){
 
     // We multiply by a large enough power of x so that the next
     // substitution is possible.
-    poly f3 = f2*var(1)^(-slN*dy);
-
+    poly f3 = f2*x^(-slN*dy);
     // Now we replace x^(|slN|)*y by  x^(|slN|)*x^slN*y = y
     poly f3Temp = f3;
     poly f4;
@@ -323,15 +352,14 @@ static proc puiseuxStep(poly f, int slN, int slD){
     {
       leadP = lead(f3Temp);
       dy3 = deg(leadP, intvec(0,1));
-      f4 = f4 + leadP / var(1)^(dy3*(-slN));
+      f4 = f4 + leadP / x^(dy3*(-slN));
       f3Temp = f3Temp - leadP;
     }
     // We can now take the equation to vanish the term with
     // smalles degree in x
-    matrix M = coef(f4,var(1));
+    matrix M = coef(f4,x);
     poly c = M[2, ncols(M)];
   }
-
   return(c);
 }
 
@@ -356,7 +384,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
 //  }
 
   int dbg = 0;
-
   def R = basering;
   intvec vy = (0,1);
   int d = deg(f, vy);
@@ -367,7 +394,7 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
   int sizeErg;
   int stop;
   int newMaxDeg;
-
+  
   poly @c;
   int newExt;
   list fc;
@@ -380,10 +407,10 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
   matrix cofs;
   number c1;
   poly fNew1, fNew2;
+  poly fNew1b; //TEST
   poly fTemp;
   int cod = 0;
   int mi;
-
   // Case of Puiseux expansions with finite number of terms
   list dd = Integralbasis::divideBy(f, var(2));
   if(dd[2]>0)
@@ -399,14 +426,14 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
 
 
   list l = newtonpoly2(f);
-
+  
   //list l = newtonpoly(f);
-
+  
   //if((l[1][1] == 0) && (l[1][2] == 0))
   //{
   //  "ERROR: The polynomial must pass through the origin.";
   //  list cs = list();
-  //} else
+  //} else 
   //{
 
 
@@ -421,7 +448,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
       slN = (-1)*slN;
       slD = (-1)*slD;
     }
-
     //if(firstTime == 1)
     //{
     //  "Computing for segment ", i, " with slope ", slN, " / ", slD;
@@ -429,7 +455,7 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
     //{
     //  "Further developing at segment ", i, " with slope ", slN, " / ", slD;
     //}
-
+    
     if(slN != 0)
     {
       g = gcd(slD, slN);
@@ -442,23 +468,21 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
         g = 1;
       }
     }
-
     slN = slN div g;
     slD = slD div g;
-
-
     // sD = sN = 0 indicates all slopes must be used.
-
     //if(bigint(sD) * slN > bigint(sN) * slD)
     //if((bigint(sD) * slN > bigint(sN) * slD) or ((sD == 0) and (sN == 0)))
     if((slN > 0) or ((sD == 0) and (sN == 0)))
     {
+    
       je = minEqNewton(f, slN, slD);
 
       fJe = factorize(je);
+      
       fJe = Integralbasis::sortFactors(fJe);
-
       fNew1 = subst(f, var(1), var(1)^slD);
+      
       for(ii = 2; ii <= size(fJe[1]); ii++)
       {
         if((ii == 2) || (nonRatCoeff(fJe[1][ii]) == 0))  // If the factor is over the ground field then it is a new conjugacy class.
@@ -466,6 +490,7 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
           cod++;
         }
         fTemp = subst(fJe[1][ii]^(fJe[2][ii]), var(1), var(1)^slD);
+
         // Checks if a new extension is needed.
         // If so, we have a new cutting point for building the factors.
         if((deg(fJe[1][ii], vy) > 1) or (size(fJe[1]) > 2))
@@ -478,10 +503,9 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
 
         @c = puiseuxStep(fTemp, slN, 1);
         fc = factorize(@c);
-
+        
         for(j = 2; j <= size(fc[1]); j++)
         {
-
           // Stopping criterium
           stop = 0;
           if(maxDeg <= 0){
@@ -493,32 +517,29 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
               stop = 1;
             }
           }
-
-          if(fc[1][j] != var(2))
-          {
+          if(fc[1][j] != var(2)){
             minP = fc[1][j];
             if(deg(minP)==1)
             {
               cofs = coeffs(minP, var(2));
               c1 = number(-cofs[1,1]/cofs[2,1]);
-              if(defined(erg))
-              {
+              if(defined(erg)){
                 sizeErg = size(erg);
-              } else
-              {
+              } else {
                 sizeErg = 1;
               }
               if(stop == 0)
               {
                 if(slN >= 0)
                 {
-                  fNew2 = subst(fNew1, var(2), (c1+var(2))*(var(1)^slN));
+                  fNew2 = subst(groebner(fNew1)[1], var(2), (c1+var(2))*(var(1)^slN));
                 } else
                 {
                   // Negative exponent case
                   fNew2 = negExp(fNew1, c1, slN);
                 }
-                fNew2= sat(ideal(fNew2), var(1))[1];
+                list dBy = Integralbasis::divideBy(groebner(fNew2)[1], var(1));
+                fNew2 = dBy[1];
 
                 if(maxDeg > 0)
                 {
@@ -526,9 +547,9 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                 } else {
                   newMaxDeg = maxDeg;
                 }
-
+                
                 csT = puiseuxMain(fNew2, newMaxDeg, slN, 1, 0);
-
+                
                 for(k = 1; k<=size(csT); k++)
                 {
                   if(typeof(csT[k]) != "ring")
@@ -537,20 +558,15 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                     if(slN >= 0)
                     {
                       cs[size(cs) + 1] = list((csT[k][1] + c1)*(var(1)^(csT[k][2]*slN)), csT[k][2]*slD);
-                    } else
-                    {
+                    } else {
                       cs[size(cs) + 1] = list(csT[k][1] + c1, csT[k][2]*slD);
                       cs[size(cs)][8] = list("Denominator", var(1) ^ (-slN*csT[k][2]));
                     }
-
-
                     // NEW CODING FOR CONJUGATED EXPANSIONS
                     cs[size(cs)][6] = insert(csT[k][6], cod);
-
                     if(newExt == 1)
                     {
-                      if(typeof(csT[k][7])=="none")
-                      {
+                      if(typeof(csT[k][7])=="none"){
                         cs[size(cs)][7] = list(0);
                       } else
                       {
@@ -559,19 +575,18 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                       cs[size(cs)][7] = sum2All(cs[size(cs)][7], slN * csT[k][2]);
                     } else
                     {
-                      if(typeof(csT[k][7]) != "none")
-                      {
+                      if(typeof(csT[k][7]) != "none"){
                         cs[size(cs)][7] = sum2All(csT[k][7], slN * csT[k][2]);
                       }
                     }
-                  } else
-                  {
+                    //"time 5";
+    
+                  } else {
                     def RT = csT[k];
                     setring RT;
                     number c1 = fetch(R, c1);
                     // Change @a by par(1)?
                     c1 = number(subst(c1, @a, number(erg[sizeErg])));
-
                     for(h = 1; h <= size(PE); h++)
                     {
                       if(slN >= 0)
@@ -583,7 +598,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                         }
                         PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
                         PE[h][2] = PE[h][2] * slD;
-
                         // NEW CODING FOR CONJUGATED EXPANSIONS
                         PE[h][6] = insert(PE[h][6], cod);
                       } else {
@@ -592,12 +606,10 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                         {
                           PE[h][7] = insert(PE[h][7], 0);
                         }
-
                         // Check if this is correct
                         // (before PE[h][8] was defined after PE[h][2] was modified)
                         PE[h][8] = list("Denominator", var(1) ^ (-slN*PE[h][2]));
                         PE[h][2] = PE[h][2] * slD;
-
                         // NEW CODING FOR CONJUGATED EXPANSIONS
                         PE[h][6] = insert(PE[h][6], cod);
                       }
@@ -628,7 +640,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                   list minPolys;
                   minPolys[1] = 1;
                 }
-
                 def S = Integralbasis::splitRingAt(minP, erg);
                 setring S;
                 sizeErg = size(erg);
@@ -647,7 +658,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                   minPolys[mi] = subst(minPolys[mi], par(1), erg[size(erg)-1]);
                 }
                 fNew1 = subst(fNew1, par(1), erg[size(erg)-1]);
-
               } else {
                 def S = Integralbasis::splitRingAt(minP);
                 setring S;
@@ -661,7 +671,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                 sizeErg = 1;
               }
               export(minPolys);
-
               if(defined(PES))
               {
                 PES = list();
@@ -674,11 +683,11 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                 if(slN >= 0)
                 {
                   poly fNew2 = subst(fNew1, var(2), (newA + var(2))*var(1)^slN);
-                } else
+                } else 
                 {
                   poly fNew2 = negExp(fNew1, newA, slN);
                 }
-                fNew2= sat(ideal(fNew2), var(1))[1];
+                fNew2 = Integralbasis::divideBy(groebner(fNew2)[1], var(1))[1];
                 if(maxDeg > 0)
                 {
                   newMaxDeg = maxDeg * slD - slN;
@@ -704,7 +713,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                         }
                         PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
                         PE[h][2] = PE[h][2] * slD;
-
                         // NEW CODING FOR CONJUGATED EXPANSIONS
                         PE[h][6] = insert(PE[h][6], cod);
                       } else
@@ -716,10 +724,8 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                         }
                         PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
                         PE[h][2] = PE[h][2] * slD;
-
                         // NEW CODING FOR CONJUGATED EXPANSIONS
                         PE[h][6] = insert(PE[h][6], cod);
-
                         PE[h][8] = list("Denominator", var(1) ^ (-slN*PE[h][2]));
                       }
                     }
@@ -738,13 +744,11 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
 
                     // NEW CODING FOR CONJUGATED EXPANSIONS
                     PES[size(PES)][6] = insert(csTS[k][6], cod);
-
                     if(newExt == 1)
                     {
                       if(typeof(csTS[k][7]) == "none")
                       {
                         PES[size(PES)][7] = list(0);
-
                       } else
                       {
                         PES[size(PES)][7] = insert(csTS[k][7], 0);
@@ -754,7 +758,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                     {
                       PES[size(PES)][7] = csTS[k][7];
                     }
-
                   }
                 }
                 if(size(PES) > 0){
@@ -772,7 +775,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
                   PE[1][7] = list(slN);
                 }
                 export PE;
-
                 setring R;
                 cs[size(cs) + 1] = S;
               }
@@ -784,480 +786,6 @@ static proc puiseuxMain(poly f, int maxDeg, int sN, int sD, int firstTime)
       }
     }
   }
-
-  if(size(cs) == 0){
-    cs = list(list(poly(0),1));
-    cs[1][6] = list(1);
-  }
-
-  return(cs);
-}
-
-
-
-///////////////////////////////////////////////////////////////////////
-
-// Computes the Puiseux expansions starting with slope >= sN / sD;
-
-// Output:
-// cs[1] = Puiseux expansion
-// cs[2] = denominator of all the exponents
-// cs[6] = code for identifying different classes
-// cs[7] = exponents where new branches appear (this is used for computing
-//         polynomials over the ground field).
-
-// It computes only one expansion in each class
-static proc puiseuxMainOneExpansion(poly f, int maxDeg, int sN, int sD, int firstTime)
-{
-  //if(firstTime == 1)
-  //{
-  //  "Computing Puiseux expansions for f = ", f;
-  //}
-  //else
-  //{
-  //  "PuiseuxMain - not first time - f", f;
-  //}
-  //
-  //~;
-
-  int dbg = 0;
-
-  def R = basering;
-  intvec vy = (0,1);
-  int d = deg(f, vy);
-  int h,i,j, ii;
-  int k = 1;
-  int slN, slD;
-  int g;
-  int sizeErg;
-  int stop;
-  int newMaxDeg;
-
-  poly @c;
-  int newExt;
-  list fc;
-  poly minP;
-  list cs;    // coefficients of the p. exp
-  list csT;
-  list out;
-  poly je;    // Minimal equation
-  list fJe;   // Factorization of the initial equation
-  matrix cofs;
-  number c1;
-  poly fNew1, fNew2;
-  poly fTemp;
-  int cod = 0;
-  int mi;
-
-  poly minPBefore;
-  list minPFacs;
-
-  // Case of Puiseux expansions with finite number of terms
-  list dd = Integralbasis::divideBy(f, var(2));
-  if(dd[2]>0)
-  {
-    for(i = 1; i <= dd[2]; i++)
-    {
-      cs[size(cs) + 1] = list(0, 1);
-      cs[size(cs)][6] = list(cod);
-      cod++;
-    }
-    f = dd[1];
-  }
-
-
-  list l = newtonpoly2(f);
-
-  //list l = newtonpoly(f);
-
-  //if((l[1][1] == 0) && (l[1][2] == 0))
-  //{
-  //  "ERROR: The polynomial must pass through the origin.";
-  //  list cs = list();
-  //} else
-  //{
-
-
-  //for(i = 1; i<size(l); i++)
-  for(i = size(l)-1; i>=1; i--)
-  {
-    slN = l[i+1][1] - l[i][1];
-    slD = l[i][2] - l[i+1][2];
-
-    // We always use positive denominator
-    if(slD < 0){
-      slN = (-1)*slN;
-      slD = (-1)*slD;
-    }
-
-    //if(firstTime == 1)
-    //{
-    //  "Computing for segment ", i, " with slope ", slN, " / ", slD;
-    //} else
-    //{
-    //  "Further developing at segment ", i, " with slope ", slN, " / ", slD;
-    //}
-
-    if(slN != 0)
-    {
-      g = gcd(slD, slN);
-    } else {
-      if(slD != 0)
-      {
-        g = slD;
-      } else
-      {
-        g = 1;
-      }
-    }
-
-    slN = slN div g;
-    slD = slD div g;
-
-
-    // sD = sN = 0 indicates all slopes must be used.
-
-    //if(bigint(sD) * slN > bigint(sN) * slD)
-    //if((bigint(sD) * slN > bigint(sN) * slD) or ((sD == 0) and (sN == 0)))
-    if((slN > 0) or ((sD == 0) and (sN == 0)))
-    {
-      je = minEqNewton(f, slN, slD);
-
-      fJe = factorize(je);
-      fJe = Integralbasis::sortFactors(fJe);
-
-      fNew1 = subst(f, var(1), var(1)^slD);
-
-      for(ii = 2; ii <= size(fJe[1]); ii++)
-      {
-        if((ii == 2) || (nonRatCoeff(fJe[1][ii]) == 0))  // If the factor is over the ground field then it is a new conjugacy class.
-        {
-          cod++;
-        }
-        fTemp = subst(fJe[1][ii]^(fJe[2][ii]), var(1), var(1)^slD);
-        // Checks if a new extension is needed.
-        // If so, we have a new cutting point for building the factors.
-        if((deg(fJe[1][ii], vy) > 1) or (size(fJe[1]) > 2))
-        {
-          newExt = 1;
-        } else
-        {
-          newExt = 0;
-        }
-
-        @c = puiseuxStep(fTemp, slN, 1);
-        fc = factorize(@c);
-
-        // Stopping criterium
-        stop = 0;
-        if(maxDeg <= 0)
-        {
-          if(fJe[2][ii] == 1)
-          {
-            stop = 1;
-          }
-        } else
-        {
-          if(slN >= slD * maxDeg)
-          {
-            stop = 1;
-          }
-        }
-
-        if(fJe[1][ii] != var(2))
-        {
-          //minP = fc[1][j];
-
-          // The minpoly of Y^5-1 is Y-1 and the minpoly of Y^5-2 is Y^5-2.
-          minPBefore = subst(fJe[1][ii],var(1),1);
-          minPFacs = factorize(minPBefore);
-          minP = minPFacs[1][2];   // Check if this always the smallest degree
-
-          if(deg(minP)==1)
-          {
-            cofs = coeffs(minP, var(2));
-            c1 = number(-cofs[1,1]/cofs[2,1]);
-            if(defined(erg))
-            {
-              sizeErg = size(erg);
-            } else
-            {
-              sizeErg = 1;
-            }
-            if(stop == 0)
-            {
-              if(slN >= 0)
-              {
-                fNew2 = subst(fNew1, var(2), (c1+var(2))*(var(1)^slN));
-              } else
-              {
-                // Negative exponent case
-                fNew2 = negExp(fNew1, c1, slN);
-              }
-              fNew2= sat(ideal(fNew2), var(1))[1];
-
-              if(maxDeg > 0)
-              {
-                newMaxDeg = maxDeg * slD - slN;
-              } else {
-                newMaxDeg = maxDeg;
-              }
-
-              csT = puiseuxMainOneExpansion(fNew2, newMaxDeg, slN, 1, 0);
-
-              for(k = 1; k<=size(csT); k++)
-              {
-                if(typeof(csT[k]) != "ring")
-                {
-                  // Case of a polynomial with the corresponding denominator;
-                  if(slN >= 0)
-                  {
-                    cs[size(cs) + 1] = list((csT[k][1] + c1)*(var(1)^(csT[k][2]*slN)), csT[k][2]*slD);
-                  } else
-                  {
-                    cs[size(cs) + 1] = list(csT[k][1] + c1, csT[k][2]*slD);
-                    cs[size(cs)][8] = list("Denominator", var(1) ^ (-slN*csT[k][2]));
-                  }
-
-
-                  // NEW CODING FOR CONJUGATED EXPANSIONS
-                  cs[size(cs)][6] = insert(csT[k][6], cod);
-
-                  if(newExt == 1)
-                  {
-                    if(typeof(csT[k][7])=="none"){
-                      cs[size(cs)][7] = list(0);
-                    } else
-                    {
-                      cs[size(cs)][7] = insert(csT[k][7], 0);
-                    }
-                    cs[size(cs)][7] = sum2All(cs[size(cs)][7], slN * csT[k][2]);
-                  } else
-                  {
-                    if(typeof(csT[k][7]) != "none"){
-                      cs[size(cs)][7] = sum2All(csT[k][7], slN * csT[k][2]);
-                    }
-                  }
-                } else
-                {
-                  def RT = csT[k];
-                  setring RT;
-                  number c1 = fetch(R, c1);
-                  // Change @a by par(1)?
-                  c1 = number(subst(c1, @a, number(erg[sizeErg])));
-
-                  for(h = 1; h <= size(PE); h++)
-                  {
-                    if(slN >= 0)
-                    {
-                      PE[h][1] = (PE[h][1] + c1) * (var(1)^(slN*PE[h][2]));
-                      if(newExt == 1)
-                      {
-                        PE[h][7] = insert(PE[h][7], 0);
-                      }
-                      PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
-                      PE[h][2] = PE[h][2] * slD;
-
-                      // NEW CODING FOR CONJUGATED EXPANSIONS
-                      PE[h][6] = insert(PE[h][6], cod);
-                    } else {
-                      PE[h][1] = PE[h][1] + c1;
-                      if(newExt == 1)
-                      {
-                        PE[h][7] = insert(PE[h][7], 0);
-                      }
-
-                      // Check if this is correct
-                      // (before PE[h][8] was defined after PE[h][2] was modified)
-                      PE[h][8] = list("Denominator", var(1) ^ (-slN*PE[h][2]));
-                      PE[h][2] = PE[h][2] * slD;
-
-                      // NEW CODING FOR CONJUGATED EXPANSIONS
-                      PE[h][6] = insert(PE[h][6], cod);
-                    }
-                  }
-                  setring R;
-                  cs[size(cs) + 1] = RT;
-                  kill RT;
-                }
-              }
-            } else {
-              cs[size(cs) + 1] = list(c1 * var(1)^slN, slD);
-              cs[size(cs)][6] = list(cod);
-              if(newExt == 1)
-              {
-                cs[size(cs)][7] = list(slN);
-              }
-            }
-          } else {
-            if(npars(R) == 1)
-            {
-              if(!defined(erg))
-              {
-                list erg;
-                erg[1] = par(1);
-              }
-              if(!defined(minPolys))
-              {
-                list minPolys;
-                minPolys[1] = 1;
-              }
-
-              def S = Integralbasis::splitRingAt(minP, erg);
-              setring S;
-              sizeErg = size(erg);
-              poly newA = erg[size(erg)];  // The root founded. That is, newA is the root of minP in S.
-              poly fNew1 = fetch(R, fNew1);
-
-              if(!defined(minPolys))
-              {
-                list minPolys = fetch(R, minPolys);
-              }
-
-              // We replace the old a by its image in the new ring.
-              minPolys[size(minPolys)+1] = fetch(R, minP);
-              for(mi = 1; mi <= size(minPolys); mi++)
-              {
-                minPolys[mi] = subst(minPolys[mi], par(1), erg[size(erg)-1]);
-              }
-              fNew1 = subst(fNew1, par(1), erg[size(erg)-1]);
-
-            } else {
-              def S = Integralbasis::splitRingAt(minP);
-              setring S;
-              list minPolys;
-              minPolys[1] = 1;
-              minPolys[size(minPolys)+1] = fetch(R, minP);
-              poly fNew1 = fetch(R, fNew1);
-              poly newA = par(1);      // In this case, it is the new variable.
-              list erg = par(1);
-              export erg;
-              sizeErg = 1;
-            }
-            export(minPolys);
-
-            if(defined(PES))
-            {
-              PES = list();
-            } else
-            {
-              list PES;
-            }
-            if(stop == 0){
-              // We use the image of the root of minP in the new ring.
-              if(slN >= 0)
-              {
-                poly fNew2 = subst(fNew1, var(2), (newA + var(2))*var(1)^slN);
-              } else
-              {
-                poly fNew2 = negExp(fNew1, newA, slN);
-              }
-              fNew2= sat(ideal(fNew2), var(1))[1];
-              if(maxDeg > 0)
-              {
-                newMaxDeg = maxDeg * slD - slN;
-              } else {
-                newMaxDeg = maxDeg;
-              }
-              list csTS = puiseuxMainOneExpansion(fNew2, newMaxDeg, slN, 1, 0);
-              for(k = 1; k<=size(csTS); k++)
-              {
-                if(typeof(csTS[k]) == "ring")
-                {
-                  def RT = csTS[k];
-                  setring RT;
-                  for(h = 1; h<=size(PE); h++)
-                  {
-                    // The new coefficient is the image of a in the new ring.
-                    if(slN >= 0)
-                    {
-                      PE[h][1] = (PE[h][1] + erg[sizeErg]) * var(1)^(PE[h][2]*slN);
-                      if(newExt == 1)
-                      {
-                        PE[h][7] = insert(PE[h][7], 0);
-                      }
-                      PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
-                      PE[h][2] = PE[h][2] * slD;
-
-                      // NEW CODING FOR CONJUGATED EXPANSIONS
-                      PE[h][6] = insert(PE[h][6], cod);
-                    } else
-                    {
-                      PE[h][1] = (PE[h][1] + erg[sizeErg]);
-                      if(newExt == 1)
-                      {
-                        PE[h][7] = insert(PE[h][7], 0);
-                      }
-                      PE[h][7] = sum2All(PE[h][7], slN * PE[h][2]);
-                      PE[h][2] = PE[h][2] * slD;
-
-                      // NEW CODING FOR CONJUGATED EXPANSIONS
-                      PE[h][6] = insert(PE[h][6], cod);
-
-                      PE[h][8] = list("Denominator", var(1) ^ (-slN*PE[h][2]));
-                    }
-                  }
-                  setring R;
-                  cs[size(cs) + 1] = RT;
-                  kill RT;
-                  setring S;
-                } else {
-                  if(slN >= 0)
-                  {
-                    PES[size(PES) + 1] = list((csTS[k][1] + newA)*var(1)^(csTS[k][2]*slN), csTS[k][2]*slD);
-                  } else {
-                    PES[size(PES) + 1] = list(csTS[k][1] + newA, csTS[k][2]*slD);
-                    PES[size(PES)][8] = list("Denominator", var(1) ^ (-slN*csTS[k][2]));
-                  }
-
-                  // NEW CODING FOR CONJUGATED EXPANSIONS
-                  PES[size(PES)][6] = insert(csTS[k][6], cod);
-
-                  if(newExt == 1)
-                  {
-                    if(typeof(csTS[k][7]) == "none")
-                    {
-                      PES[size(PES)][7] = list(0);
-
-                    } else
-                    {
-                      PES[size(PES)][7] = insert(csTS[k][7], 0);
-                    }
-                    PES[size(PES)][7] = sum2All(PES[size(PES)][7], slN * csTS[k][2]);
-                  } else
-                  {
-                    PES[size(PES)][7] = csTS[k][7];
-                  }
-
-                }
-              }
-              if(size(PES) > 0){
-                list PE = PES;
-                export PE;
-                setring R;
-                cs[size(cs) + 1] = S;
-              }
-            } else {
-              poly PE1 = newA*var(1)^slN;
-              list PE = list(list(PE1, slD));
-              PE[1][6] = list(cod);
-              if(newExt == 1)
-              {
-                PE[1][7] = list(slN);
-              }
-              export PE;
-
-              setring R;
-              cs[size(cs) + 1] = S;
-            }
-            kill S;
-          }
-        }
-        setring R;
-      }
-    }
-  }
-
   if(size(cs) == 0){
     cs = list(list(poly(0),1));
     cs[1][6] = list(1);
@@ -1294,7 +822,6 @@ EXAMPLE: example newtonpoly2;  shows an example
       j++;
     }
   }
-
   list l2;
   int rep = 1;
   while(rep == 1)
@@ -1345,7 +872,6 @@ static proc negExp(poly fNew1, poly c1, int slN)
   // We multiply by a large enough power of x so that the next
   // substitution is possible.
   poly f3 = fNew1*(var(1)^(-slN*dy));
-
   //We replace var(2) by var(1)^slN*(c1 + var(2));
   poly f3Temp = f3;
   poly f4;
@@ -1371,16 +897,17 @@ static proc negExp(poly fNew1, poly c1, int slN)
       leadExpT = lead(expTTemp);
       expTTemp = expTTemp - leadExpT;
       dxExpT = deg(leadExpT, intvec(1,0));
-
       // IN k * x^a * leadExpT, substitute the x in leadExpT by x^(-slN)
       f4T = f4T + leadP/var(1)^(dxExpT*(-slN))/(var(2)^dy3) * subst(leadExpT, var(1), 1);
     }
     f4 = f4 + f4T;
     f3Temp = f3Temp - leadP;
   }
-  f4 = sat(ideal(f4), var(1))[1];
+  f4 = Integralbasis::divideBy(groebner(f4)[1], var(1))[1];
+
   return(f4);
 }
+
 
 
 // Main procedure for computing Puiseux expansions returning a list of
@@ -1406,9 +933,7 @@ EXAMPLE: example puiseuxList;  shows an example
   def R = basering;
   def R_PP = PP.in;
   setring R_PP;
-
   poly PP_numer = PP.numer;
-
   // We move to a ring where the only variables are varX and varY
   list l = ringlist(R_PP);
   list lNew = l;
@@ -1436,17 +961,16 @@ EXAMPLE: example puiseuxList;  shows an example
   //  fFacs = Integralbasis::sortFactors(fFacs);
   //
   //  for(i = 1; i <= size(fFacs[1]); i++)
-  //  {
+  //  { 
   //    if((fFacs[1][i] != 1) and (deg(fFacs[1][i], intvec(0,1)) > 0))
   //    {
   //      p = p + puiseuxMain(fFacs[1][i], maxDeg, 0, 0, 1);
   //    }
   //  }
-  //} else
+  //} else 
   //{
   //  p = puiseuxMain(f, maxDeg, 0, 0, 1);
   //}
-
   p = puiseuxMain(f, maxDeg, 0, 0, 1);
 
   // We create a list of type Puiseux with one element for each Puiseux
@@ -1459,17 +983,14 @@ EXAMPLE: example puiseuxList;  shows an example
     {
       def R1 =  p[i];
       setring R1;
-
       // We add back the removed variables
       list lR1 = ringlist(R1);
       list l = imap(R_PP, l);
       lR1[2] = l[2];
       lR1[3] = l[3];
-
       def S1 = ring(lR1);
       setring S1;
       list PE = imap(R1, PE);
-
       // We create the new elements of the list, one element
       // for each Puiseux expansion in PE.
       for(j = 1; j <= size(PE); j++)
@@ -1482,7 +1003,6 @@ EXAMPLE: example puiseuxList;  shows an example
         // The denominator of the exponent gets multiplied by the
         // the new denominator of the exponent
         P.fraction = PE[j][2] * PP.fraction;
-
         // The old denominator is discarded
         if(size(PE[j]) >= 8)
         {
@@ -1508,18 +1028,14 @@ EXAMPLE: example puiseuxList;  shows an example
     } else
     {
       // Case of Puiseux expansions over the basering
-
       // We move back to the original ring with all the variables
       setring R_PP;
       list p2 = imap(S, p);
-
       // We create the new element of the list
       poly pui = p2[i][1];
       Puiseux P = pui;
       kill pui;
-
       P.in = basering;
-
       // The denominator of the exponent gets multiplied by the
       // the new denominator of the exponent
       P.fraction = p2[i][2] * PP.fraction;
@@ -1543,7 +1059,6 @@ EXAMPLE: example puiseuxList;  shows an example
   kill PP_numer;
   kill l;
   kill lNew;
-
   setring R;
   return(out);
 }
@@ -1611,9 +1126,29 @@ static proc sum2All(list l, int k)
   }
   return(l);
 }
+
 ///////////////////////////////////////////////////////////////////////////////
 
+// List of exponents of a Puiseux expansion
+proc puiseuxExponents(Puiseux F)
+{
+  def R = basering;
+  def S = F.in;
+  setring S;
+  matrix cMat = coef(F.numer, var(1));
+  list l;
+  int expo;
+  for(int i = 1; i <= ncols(cMat); i++)
+  {
+    expo = deg(cMat[ncols(cMat) - i + 1]) - deg(F.denom);
+    l[i] = number(expo) / number(F.fraction);
+  }
+  setring R;
+  list l = fetch(S, l);
+  return(l);
+}
 
+///////////////////////////////////////////////////////////////////////////////
 
 // Checks if the coefficents of a polynomial are rational or contain some parameter
 static proc nonRatCoeff(poly p)

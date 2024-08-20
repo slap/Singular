@@ -68,6 +68,9 @@ proc normal(ideal id, list #)
          not equidimensional radical, output might be wrong.@*
          - \"isPrim\" -> assumes that the ideal is prime. If this assumption
          does not hold, the output might be wrong.@*
+         - \"atOrigin\" -> assumes that the ideal contains only one singularity, and that 
+         this singularity is located at the origin. If this assumption 
+         does not hold, the output might be wrong.@*
          - \"noFac\" -> factorization is avoided in the computation of the
          minimal associated primes;
          Other:@*
@@ -272,7 +275,11 @@ EXAMPLE: example normal; shows an example
           }
         }
         // We now have a monic polynomial and we can compute the integral basis.
-        list out = integralBasis(f, intVar);
+        if(in_array(#, "atOrigin")) {
+          list out = integralBasis(f, intVar, "atOrigin");
+        } else {
+          list out = integralBasis(f, intVar);
+        }
 
         // If we applied some transformation, we apply it back.
         if(isMonic == 0)
@@ -383,6 +390,12 @@ EXAMPLE: example normal; shows an example
       {denomOption = 1;}
       if (#[i]=="var2")
       {denomOption = 2;}
+      
+      // When there is only one singularity at the origin, we 
+      // localize at the maximal ideal.
+      if (#[i]=="atOrigin") {
+        inputJ = maxideal(1);
+      }      
     }
     if(typeof(#[i]) == "list"){
       if(size(#[i]) == 2){

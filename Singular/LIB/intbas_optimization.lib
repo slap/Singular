@@ -1,0 +1,677 @@
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+version="$Id$";
+category="Commutative Algebra";
+info="
+LIBRARY:  intbasoptim.lib  Integral basis in algebraic function fields
+AUTHORS:  J. Boehm, boehm at mathematik.uni-kl.de
+          W. Decker, decker at mathematik.uni-kl.de
+          S. Laplagne, slaplagn at dm.uba.ar
+          G. Pfister, pfister at mathematik.uni-kl.de
+
+OVERVIEW:
+Given an irreducible polynomial f in two variables defining a plane curve,
+this library implements an algorithm to compute an integral basis of the
+integral closure of the affine coordinate ring in the algebraic function
+field via normalization.@*
+The user can choose whether the algorithm will do the computation globally
+or (this is the default) compute in the localization at each component of
+the singular locus and put everything together.
+
+PROCEDURES:
+ integralBasis(f, intVar, list #); Integral basis of an algebraic function field
+ polyDK(int d, int k, list #);     Polynomial with an ordinary multiple point at the origin
+ monic(poly f);                    Makes a polynomial monic
+ henselGlobal(poly f, poly g, poly h, int order);  Splits a polynomial using Hensel lifting
+";
+
+LIB "normal.lib";
+LIB "locnormal.lib";
+LIB "assprimeszerodim.lib";
+LIB "puiseuxexpansions.lib";
+LIB "classify.lib";  // For init_debug() and debug_log() procedures
+
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+//////////////////////////////////////////////////////////////////////////////
+//
+//    OPTIMIZATION APPROACH TO COMPUTE THE INTEGRAL BASIS AS EXPLAINED IN THE
+//    PAPER by Boehm, Decker, Laplagne & Seelisch
+//
+//    In most cases this is faster than locLocAlgorithm
+//
+/////////////////////////////////////////////////////////////////////////////
+
+// Input:  n is the degree of f
+// Output: local contribution to the integral basis at the origin
+// Algorithm: incorporates the local contributions to the integral basis
+//            one by one in an optimized way
+// [Example 4]
+
+proc optimAlgorithm(int n, int locBasis, int d0, int d1, intvec vxy, matrix M, list MSelf, intvec md, list classes, poly unitLiftedFull, list I2LiftedFull, matrix ordsFull, list bestElem, int optimize, list bF, list blocks)
+{
+  //"START - intbasoptim.lib - optimAlgorithm - 1";  
+  int i, j, k;
+  int t = timer;
+  list b;
+
+  number maxExp;
+  poly num;
+  list ibNum;
+  list ibDen;
+  poly p, p1, p2;
+  t = timer;
+  intvec elem;
+  
+  int nBlocks;
+
+  int dbg = printlevel - voice + 5;
+
+  intvec vy = (0,1);
+  intvec vx = (1,0);
+  poly x = var(1);
+  poly y = var(2);
+  int slD = vxy[1];
+
+  if(blocks[size(blocks)] != size(blocks)) // More than one class in a block
+  {
+    //proc MBlocks(list classes, matrix M, list MSelf, list bF, list blocks, list I2LiftedFull)  
+    list MOrd = MBlocks(classes, M, MSelf, bF, blocks, unitLiftedFull, I2LiftedFull, bestElem, md);
+    M = MOrd[1];
+    MSelf = MOrd[2];
+    bestElem = MOrd[3];
+    I2LiftedFull = MOrd[4];
+    md = MOrd[5];
+  }
+  nBlocks = size(I2LiftedFull);
+  
+  //"md = "; md;
+  //~;
+
+  dbprint(dbg, "Computing all the elements of the integral basis...");
+  
+//  "d0 = ", d0;
+//  "Classes";
+//  classes;
+//  
+//  ~;
+
+  optimize = 1;
+  
+  list bestElems;
+  if(optimize == 1)
+  {
+    bestElems = optiBest(M, MSelf, md, n);
+    //for(k = 1; k < d0; k++)
+    //{
+      //"elem: ", bestElems[k+1][2], " - ", bestElems[k+1][1];
+    //}
+  } else 
+  {
+    //"optimize = 0";
+    bestElems[1] = list();
+    for(k = 1; k < d0; k++)
+    {
+      bestElems[k+1] = Integralbasis::ibElement(M, MSelf, k, md);
+      //"elem: ", bestElems[k+1][2], " - ", bestElems[k+1][1];
+    }
+  }
+  
+  
+  //"bestElems";
+  //bestElems;
+  //~;
+
+  if(locBasis == 0)
+  {
+    for(k = 1; k <= d1+1; k++)
+    {
+      ibNum[k] = y^(k-1);
+      ibDen[k] = 1;
+    }
+  } else
+  {
+    ibNum[1] = 1;
+    ibDen[1] = 1;
+  }
+
+  poly pTemp;
+  for(k = 1; k < d0; k++)
+  {
+    
+    //if(size(classes) > 1)
+    if(nBlocks > 1) // check
+    {
+      maxExp = bestElems[k+1][1];
+      elem = bestElems[k+1][2];
+    } else
+    {
+      maxExp = MSelf[1][k];
+      elem[1] = k;
+    }
+    if(dbg >= 3)
+    {
+      "element ", k, ": ", elem;
+    }
+
+    num = 1;
+    for(i = 1; i <= size(elem); i++)
+    {
+      if((elem[i] > 0) and (elem[i] < md[i]))
+      {
+        pTemp = jet(bestElem[i][elem[i]], int(maxExp), vx);
+        pTemp = jet(pTemp, int(maxExp*slD), vxy);
+        num = num * pTemp;
+        num = jet(num, int(maxExp), vx);
+        num = jet(num, int(maxExp*slD), vxy);
+      }
+    }
+    for(i = 1; i <= size(elem); i++)
+    {
+      if(elem[i] == md[i])
+      {
+        pTemp = jet(I2LiftedFull[i], int(maxExp), vx);
+        pTemp = jet(pTemp, int(maxExp*slD), vxy);
+        num = Integralbasis::prodMod(num, pTemp, int(maxExp) + 1);
+        num = jet(num, int(maxExp), vx);
+        num = jet(num, int(maxExp*slD), vxy);
+      }
+    }
+
+    p1 = jet(num, int(maxExp*slD), vxy);
+    if((locBasis == 1) or (d1 == 0))
+    {
+      ibNum[k+1] = p1;
+      ibDen[k+1] = x^int(maxExp);
+    } else
+    {
+      p2 = jet(unitLiftedFull, int(maxExp-1), vx);
+      p = jet(p1*p2, int(maxExp-1), vx);
+      ibNum[k+d1+1] = p;
+      ibDen[k+d1+1] = x^int(maxExp);
+    }
+    //"k = ", k;
+    //"p = ", p;
+    //~;
+  }
+  //"Construction finished.";
+  //ibNum;
+  //ibDen;
+  //~; 
+  
+  ideal IOut;
+  if(locBasis == 1)
+  {
+    for(i = 1; i<=d0; i++)
+    {
+      IOut[i] = (ibNum[i] * ibDen[d0]) / ibDen[i];
+    }
+  } else
+  {
+    for(i = 1; i<=n; i++)
+    {
+      IOut[i] = (ibNum[i] * ibDen[n]) / ibDen[i];
+    }
+  }
+  if(dbg >= 2)
+  {
+    "Time basis construction: ", timer - t;
+  }
+  return(IOut);
+}
+
+// Efficient implementation of the optimization problem
+// Output: A list, with the maximal valuation for each degree, and how
+//         many elements to take in each conjugacy class of expansions
+// [Example 1]
+proc optiBest(matrix M, list MSelf, intvec md, int k)
+{
+  //"START - newib.lib - optiBest - 1";
+  int i, j;
+  int nClasses = size(md);
+  
+//  "optiBest input: ";
+//  "M = "; M;
+//  "MSelf = "; MSelf;
+//  "md = ", md;
+//  "k = ", k;
+  
+  list beNew, beOld;
+  intvec choice;
+  number val;
+  int totNew = md[nClasses];
+  int totOld;
+  
+  // Valuations choosing only elements of the last class
+  for(i = 1; i <= totNew + 1; i++)
+  {
+    choice[1] = i - 1;
+    if(i == 1){
+      val = 0;
+    } else {
+      if(i == md[nClasses] + 1){
+        val = -1;
+      } else {
+        val = MSelf[nClasses][i-1];
+      }
+    }
+    beOld[i] = list(val, choice);
+  }
+//  "-Valuations for the last class-";
+//  "beOld"; beOld;
+//  ~;
+  
+  // We add the other classes one by one
+  int best1, best2;
+  number bestV;
+  number val1, val2;
+  for(j = size(md) - 1; j>=1; j--)
+  {
+    totOld = totNew;  // The total number of expansions without including the current class
+    totNew = totNew + md[j];  // The total number of expansions including the current class
+    for(i = 1; i <= totNew + 1; i++)
+    {
+      bestV = -1;
+      
+//      "constructing element of degree i-1 = ", i-1;
+
+      for(k = 1; k <= md[j] + 1; k++)
+      {
+        //  We consider k expansions from the new class and i-k from the previous ones
+        // val1 is the valuation of an expansion of the new class at each element
+        // val2 is the smallest valuation of an expansion of the old classes
+
+//        "degree in class 1: k-1 = ", k-1;
+//        "degree in other classes: i - k = ", i-k;
+
+        
+        if(((k - 1) <= (i-1)) and (i - k <= totOld))
+        {
+          //"MSelf, i, j, k"; MSelf, i, j, k;
+          //"a, b: ", k-1, i-k;
+          if(k > 1)
+          {
+            if(k-1 == md[j])
+            {
+              val1 = -1;  // If we consider all the valuations
+            } else
+            {
+//              "MSelf[j][k-1]", MSelf[j][k-1];
+//              "M[j, j+1]", M[j, j+1];
+//              "(i-k)",(i-k);
+              val1 = number(MSelf[j][k-1] + (i-k)*M[j, j+1]);  // the valuation of an expansion of the new clas
+            }
+          } else 
+          {
+            val1 = number((i-k)*M[j, j+1]);
+          }
+          if(beOld[i-k+1][1] > -1) 
+          {
+            val2 = number((k-1)*M[j, j+1] + beOld[i-k+1][1]);
+          } else 
+          {
+            val2 = -1;
+          }
+          if(((val1 < val2) and (val1 > -1)) or (val2 == -1))  // The valuation is the smallest between val1 and val2
+          {
+            val = val1;
+          } else {
+            val = val2;
+          }
+//          "val1, val2: ", val1, val2;
+//          "val: ", val;
+          if((val > bestV) or (val == -1))
+          {
+            //"i-k", i-k;
+            choice = k-1, beOld[i-k+1][2];
+            beNew[i] = list(val, choice);
+            bestV = val;
+          }
+        }
+      }
+      //"elem: ", beNew[i][2], " - ", beNew[i][1];
+      //"i: ", i;
+      //"beNew[i]", beNew[i];
+    }
+    beOld = beNew;
+  }
+//  "beNew";
+//  beNew;
+//  //~;
+  return(beNew);
+}
+
+
+
+// Optimization for blocks
+
+// Input:  n is the degree of f
+// Output: local contribution to the integral basis at the origin
+// Algorithm: incorporates the local contributions to the integral basis
+//            one by one in an optimized way
+
+// unitLiftedFull is the unit outside the origin lifted
+// I2LiftedFull are the factors corresponding to the classes in the block, numbered starting from 1
+proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, poly unitLiftedFull, list I2LiftedFull, int optimize, list bF, list blocks)
+{
+  
+//  "CLASSES"; 
+//  classes;
+//  ~;
+  
+  // We create the list of polynomials and their degrees
+  int i, j, k;
+  int new;
+  
+  number minOrd;
+  number maxExp = 0;
+  int maxExpi;    // The value of i for the max exp.
+  
+  intvec vy = (0,1);
+  
+  int ind;
+  int maxPow;
+  list polys;
+  list polys_deg;
+  list polys_class;
+  list polys_maxPow;
+  
+  list bElem;
+  
+  // We construct all the polynomials that can be used as factors of the integral elements
+  
+  // The full lifted factors
+  for(i = 1; i <= size(I2LiftedFull); i++)
+  {
+    ind = size(polys) + 1;
+    polys[ind] = I2LiftedFull[i];
+    polys_deg[ind] = deg(I2LiftedFull[i], vy);
+    polys_class[ind] = i;  // The class of expansions corresponding to the lifted factor
+    polys_maxPow[ind] = 1;
+  }
+  
+  // The factors corresponding to truncations
+  for(i = 1; i <= size(bF[1]); i++)
+  {
+    for(j = 1; j <= size(bF[1][i]); j++)
+    {
+      new = 1;
+      maxPow = deg(I2LiftedFull[i], vy) div polys_deg[ind];  // The number of factors that can appear in the factorization contributed by the corresponding class.
+                                                               // Probably we can use this number - 1
+      for(k = 1; k <= size(polys); k++)
+      {
+        if((reduce(polys[k], bF[1][i][j]) == 0) && (reduce(bF[1][i][j], polys[k]) == 0))
+        {
+          new = 0;
+          polys_maxPow[ind] = polys_maxPow[ind] + maxPow;
+        }
+      }
+      if(new == 1)
+      {
+        ind = size(polys) + 1;
+        polys[ind] = bF[1][i][j];
+        polys_deg[ind] = deg(bF[1][i][j], vy);
+        polys_class[ind] = 0;  // It is not a lifted factor
+        polys_maxPow[ind] = maxPow;
+      }
+    }
+  }
+  
+  int s = size(classes);
+  int sC = size(polys);
+  number order(1..s);
+
+//  "classes";
+//  classes;
+//
+//  "polys";
+//  polys;
+//  
+//  "polys_deg";
+//  polys_deg;
+//  
+//  "polys_maxPow";
+//  polys_maxPow;
+  
+
+  list bElems;
+  intvec elem;
+  list sums;
+  
+  number tt;
+  
+  matrix ordPolAtClass[sC][s];
+  for(j = 1; j <= s; j++)  // Classes
+  {
+    for(k = 1; k <= sC; k++)   // Polynomials
+    {
+      ordPolAtClass[k,j] = number(Integralbasis::ordAtPol(polys[k], classes[j][1]));
+      //"jsdkf";
+      //ordPolAtClass[k,j] = tt;
+    }
+  }
+  
+  int dd;
+  for(dd = 1; dd < d0; dd++)
+  {
+    sums = Integralbasis::summandsDeg(dd, size(polys), polys_deg, polys_maxPow);
+
+//    "sums";
+//    sums;
+  
+    for(i = 1; i <= size(sums); i++)
+    {
+      minOrd = 0;
+      for(j = 1; j <= s; j++)  // Classes
+      {
+        order(j) = 0;
+        for(k = 1; k <= sC; k++)   // Polynomials
+        {
+          if(order(j) > -1)
+          {
+            if(sums[i][k] > 0)
+            {
+//              "i, j, k", i, j, k;
+//              sums[i];
+//              polys[k];
+//              classes[j];
+              if(polys_class[k] == j)
+              {
+                order(j) = -1; // When the full lifted factor is used, the valuation at an expansion of the same class is infinity.
+              } else {
+                //order(j) = order(j) + number(Integralbasis::ordAtPol(polys[k], classes[j][1])) * number(sums[i][k]);
+                order(j) = order(j) + number(ordPolAtClass[k,j]) * number(sums[i][k]);
+              }
+            } 
+          }
+        }
+        if(((order(j) < minOrd) or (minOrd == 0)) and (order(j) > -1))
+        {
+          minOrd = order(j);
+        }
+      }
+      if(minOrd > maxExp)
+      {
+        maxExp = minOrd;
+        maxExpi = i;
+      }
+    }
+    elem = sums[maxExpi];
+    bElem[size(bElem) + 1] = list(elem, maxExp);
+  }
+  
+  list ibNum;
+  list ibDen;
+  list elemOrd;
+  
+  if(locBasis == 0)
+  {
+    for(k = 1; k <= d1+1; k++)
+    {
+      ibNum[k] = y^(k-1);
+      ibDen[k] = 1;
+      elemOrd[k] = 0;
+    }
+  } else
+  {
+    ibNum[1] = 1;
+    ibDen[1] = 1;
+    elemOrd[1] = 0;
+  }
+  
+  poly p;
+  poly p1;
+  poly p2;
+  
+  intvec vx = (1,0);
+  
+  for(k = 1; k < d0; k++)
+  {
+    //p1 = jet(num, int(maxExp*slD), vxy);
+    p1 = 1;
+    for(j = 1; j <= sC; j++)
+    {
+      if(bElem[k][1][j] > 0)
+      {
+        p1 = p1 * polys[j]^(bElem[k][1][j]);
+      }
+    }
+    maxExp = bElem[k][2];
+      
+    if((locBasis == 1) or (d1 == 0))
+    {
+      ibNum[k+1] = p1;
+      ibDen[k+1] = x^int(maxExp);
+      elemOrd[k+1] = maxExp;
+    } else
+    {
+      p2 = jet(unitLiftedFull, int(maxExp-1), vx);
+      p = jet(p1*p2, int(maxExp-1), vx);
+      ibNum[k+d1+1] = p;
+      ibDen[k+d1+1] = x^int(maxExp);
+      elemOrd[k+d1+1] = maxExp;
+    }
+  }
+
+//  "basis";
+//  ibNum;
+//  ibDen;
+//  //bElem;
+//  ~;
+
+  ideal IOut;
+  if(locBasis == 1)
+  {
+    for(i = 1; i<=d0; i++)
+    {
+      IOut[i] = (ibNum[i] * ibDen[d0]) / ibDen[i];
+    }
+  } else
+  {
+    for(i = 1; i<=n; i++)
+    {
+      IOut[i] = (ibNum[i] * ibDen[n]) / ibDen[i];
+    }
+  }
+//  if(dbg >= 2)
+//  {
+//    "Time basis construction: ", timer - t;
+//  }
+
+  return(list(IOut, list(ibNum[2..size(ibNum)]), list(elemOrd[2..size(ibNum)])));  // We ignore the term of degree 0
+}
+  
+  
+// Computes the valuations of expansions from each block of classes at other blocks of classes
+proc MBlocks(list classes, matrix M, list MSelf, list bF, list blocks, poly unitLifted, list I2LiftedFull, list bestElem, intvec md)
+{
+  int i, j;
+  
+  int nClasses = size(classes);
+  int nBlocks = blocks[nClasses];
+  matrix MB[nBlocks][nBlocks];
+  list MBSelf;
+  int optimize = 1;
+  int n, d0;
+  int d1 = 0;
+  int locBasis = 1;
+  poly unitLiftedFull = 1;
+  list I2LiftedFullBlock;
+  list I2LiftedFullPoly;
+  list classesBlock;
+  list bFBlock;
+  list blocksBlock;
+  list bestElem_blocks;
+  intvec md_blocks;
+  
+  poly I2Poly;
+  
+  list classesBlocks_all;
+  
+  intvec vy = (0,1);
+  intvec vxy = (0,0); // not used
+  
+  int first;
+  
+  for(i = 1; i <= nBlocks; i++)
+  {
+    classesBlock = list();
+    I2LiftedFullBlock = list();
+    bFBlock[1] = list();
+    bFBlock[2] = list();
+    bFBlock[3] = list();
+    bFBlock[4] = list();
+    d0 = 0;
+    first = 1;
+    
+    md_blocks[i] = 0;
+    
+    for(j = 1; j <= nClasses; j++)
+    {
+      if(blocks[j] == i)
+      {
+        if(first == 1) // FIX -> Not very clean. We should if the block contains more than one class.
+        {
+          MBSelf[i] = MSelf[j]; 
+          bestElem_blocks[i] = bestElem[j];
+          I2LiftedFullPoly[i] = I2LiftedFull[j];
+        }
+        
+        classesBlock[size(classesBlock)+1] = classes[j];
+        I2LiftedFullBlock[size(I2LiftedFullBlock) + 1] = I2LiftedFull[j];
+        bFBlock[1][size(bFBlock[1]) + 1] = bF[1][j];
+        bFBlock[2][size(bFBlock[2]) + 1] = bF[2][j];
+        bFBlock[3][size(bFBlock[3]) + 1] = bF[3][j];
+        bFBlock[4][size(bFBlock[4]) + 1] = bF[4][j];
+        blocksBlock[size(blocksBlock) + 1] = 1;
+        d0 = d0 + deg(I2LiftedFull[j], vy);
+        md_blocks[i] = md_blocks[i] + md[j];
+      }
+    }
+    classesBlocks_all[i] = classesBlock;
+    n = d0;
+    if(size(classesBlock) > 1)
+    {
+      // We use this to compute MSelf for the blocks
+      list intBasBlock = optimAlgorithmBlocks(n, locBasis, d0, d1, classesBlock, unitLiftedFull, I2LiftedFullBlock, optimize, bFBlock, blocksBlock);
+      MBSelf[i] = intBasBlock[3];
+      bestElem_blocks[i] = intBasBlock[2];
+      I2Poly = 1;
+      for(j = 1; j <= size(I2LiftedFullBlock); j++)
+      {
+        I2Poly = I2Poly * I2LiftedFullBlock[j];
+      }
+      I2LiftedFullPoly[i] = I2Poly;
+    }
+  }
+  MB = Integralbasis::valIKBlocks(classesBlocks_all);
+  list out = MB, MBSelf, bestElem_blocks, I2LiftedFullPoly, md_blocks;
+  //"out = ";
+  //out;
+  //~;
+  return(out);
+}
+
