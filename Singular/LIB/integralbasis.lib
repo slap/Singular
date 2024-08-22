@@ -1223,6 +1223,10 @@ static proc ibAt0(poly f, int locBasis, int optimize)
   debug_log_intbas(3, "------Time Hensel Blocks: ", timer - tt);
   tt = timer;
 
+//  "Classes before recomputation...";
+//  classes;
+//  list classesOld = classes;
+//  ~;
 
 ////////////////////////////////////////////////////////////////////////
 // RECOMPUTE CLASSES USING HENSEL BLOCKS
@@ -1268,6 +1272,8 @@ static proc ibAt0(poly f, int locBasis, int optimize)
     // Tables of vanishing order of diferences of puiseux expansions
     dbprint(dbg, "Computing vanishing orders...");
     M = valIK(classes);
+//    "M = ", M;
+//    ~;
 
     vS = valIKSelf(bF, md);
     MSelf = vS[1];
@@ -1288,6 +1294,11 @@ static proc ibAt0(poly f, int locBasis, int optimize)
 ///////////////////////////////////////////////////////////////////////
   //dbprint(dbg, "Output of Hensel Blocks: ");
   //dbprint(dbg, I2Lifted);
+  
+//  "Classes after recomputation...";
+//  classes;
+//  ~;
+  
   int cl;
   int nClasses;
   nClasses = size(classes);
@@ -1343,6 +1354,11 @@ static proc ibAt0(poly f, int locBasis, int optimize)
   
   // The classes are reordered in the same order as the irreducible factors
   classes = ifOut[5];
+  
+//  // Recomputed classes
+//  "Recomputed classes";
+//  classes;
+//  ~;
   
   if((ifOut[4] == 1))  // Wrong number of factors, recompute orders
   {
@@ -1456,7 +1472,8 @@ static proc ibAt0(poly f, int locBasis, int optimize)
   list l1, l2;
   tt = timer;
 
-  "optimize = ", optimize;
+//  "optimize = ", optimize;
+//  ~;
   
   if(optimize == 0)
   {
@@ -1927,7 +1944,8 @@ static proc getSlope(list slopes)
 //         factors.
 //         The third element is a list of the degrees of the corresponding
 //         factors.
-static proc buildFactors(list classes)
+//static proc buildFactors(list classes)
+proc buildFactors(list classes)
 {
   int i, j;
   int d = -1;
@@ -2144,7 +2162,9 @@ static proc buildFactors(list classes)
 //         working on an extension of an extension)
 // Output: polynomial = the product of (y-f_i) for all conjugate polynomials
 //         f_i of f.
-static proc buildPolyFracNew(poly f, poly mp)
+
+//static proc buildPolyFracNew(poly f, poly mp)
+proc buildPolyFracNew(poly f, poly mp)
 {
   int i;
   def R = basering;
@@ -2201,7 +2221,8 @@ static proc buildPolyFracNew(poly f, poly mp)
 // Input:  a polynomial f over an algebraic extension of the base ring.
 // Output: polynomial = the product of (y-f_i) for all conjugate polynomials
 //         f_i of f.
-static proc buildPolyFrac(poly f)
+//static proc buildPolyFrac(poly f)
+proc buildPolyFrac(poly f)
 {
   int i;
   def R = basering;
@@ -2458,7 +2479,9 @@ static proc valIK(list classes)
     {
       def S = classes[i][1];
       setring S;
-      poly f = subst(PE[1][1], @a, 0);
+      poly f = subst(PE[1][1], @a, i);   // We change to i so that we can compare with expansions in other rings,
+                                         // and expansions from different classes have different coefficients.
+                                         // This should be done correctly!
       int den(i) = PE[1][2];
       number o = number(ratDeg(PE[1][1])) / number(den(i));
       setring R;
@@ -2491,6 +2514,7 @@ static proc valIK(list classes)
       if(differ != 0){
         k = orderExp(differ);
         ordDiff = number(k) / number(den(i)*den(j));
+        
         // The order of the difference cannot be greater than the o(i) when
         // the i-th expansion is non-rational when all the expansions in the
         // block are in the same class.
@@ -2515,7 +2539,6 @@ static proc valIK(list classes)
       }
     }
   }
-  
   return(M);
 }
 
@@ -2967,7 +2990,9 @@ static proc explodeRings(list l)
 // Output: a list classes, where each element is a list of conjugate
 //         Puiseux expansions (given also either as expansions over the base
 //         rings or defined in extension rings).
-static proc getClasses(list l)
+
+//static proc getClasses(list l)
+proc getClasses(list l)
 {
   int i;
   int j;
@@ -4277,10 +4302,12 @@ proc henselBlocks(poly f, int globOrder, int loc)
   intvec vx = (1,0);
   intvec vy = (0,1);
   int maxOrder = deg(f, vx);
+    
   if(globOrder > maxOrder)
   {
     maxOrder = globOrder;
   }
+    
   int locOrder = maxOrder;
 
   if(loc == 1)
@@ -4301,6 +4328,7 @@ proc henselBlocks(poly f, int globOrder, int loc)
     comp = 2;
     dbprint(dbg, "----Computing Puiseux Segments...");
     fSegment = henselSegments(fLoc, maxOrder);
+    
     
     for(i = 1; i <= size(fSegment); i++)
     {
