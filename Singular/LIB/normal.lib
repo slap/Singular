@@ -278,9 +278,9 @@ EXAMPLE: example normal; shows an example
         }
         // We now have a monic polynomial and we can compute the integral basis.
         if(in_array(#, "atOrigin")) {
-          list out = integralBasis(f, intVar, "atOrigin", "opti0");  // The optimization algorithm is not implemented when the expansions have common rational part.
+          list out = integralBasis(f, intVar, "atOrigin", "opti1");  // The optimization algorithm is not implemented when the expansions have common rational part.
         } else {
-          list out = integralBasis(f, intVar, "opti0");  // The optimization algorithm is not implemented when the expansions have common rational part.
+          list out = integralBasis(f, intVar, "opti1");  // Check the optimization algorithm when the expansions have common rational part.
         }
 
         // If we applied some transformation, we apply it back.
