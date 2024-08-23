@@ -75,9 +75,6 @@ proc optimAlgorithm(int n, int locBasis, int d0, int d1, intvec vxy, matrix M, l
   poly x = var(1);
   poly y = var(2);
   int slD = vxy[1];
-
-  "optimAlgorithm";
-  ~;
   
   if(blocks[size(blocks)] != size(blocks)) // More than one class in a block
   {

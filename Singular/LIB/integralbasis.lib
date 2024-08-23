@@ -1213,11 +1213,29 @@ static proc ibAt0(poly f, int locBasis, int optimize)
     }
   }
 
+
   debug_log_intbas(3, "------Time for factors info: ", timer - tt);
   tt = timer;
   dbprint(dbg, "--Building HenselBlocks...");
   int degExpand = int(maxExp) + 1;
   dbprint(dbg, "---- Degree of expansions: ", degExpand);
+
+  // We develope up to the total x-degree of the product of the Puiseux expansions, so that we dont loose information!
+  // TO DO: compute the hensel blocks from the expansions, dont recompute the expansions from the blocks.
+  int maxOrderPE = totalDegreePE(classes);
+  
+  "maxOrderPE = ", maxOrderPE;
+  "degExpand = ", degExpand;
+  
+  if(maxOrderPE + 1> degExpand)
+  {
+    degExpand = maxOrderPE + 1;
+  }
+  
+  // NOOO!!
+  degExpand = degExpand + 10;
+
+
   // Computing hensel blocks...
   list I2Lifted = henselBlocks(f, degExpand, 1);
   debug_log_intbas(3, "------Time Hensel Blocks: ", timer - tt);
@@ -2038,6 +2056,11 @@ proc buildFactors(list classes)
           exps = expsT;
         }
       }
+      
+      // Remove! This is we need to calculate the full factor from the Puiseux expansions.
+      //exps = appendIntvecs(exps, intvec(-1));
+      //"exps = ", exps;
+      
       for(k = 1; k <= size(exps); k++)
       {
         d = exps[k];
@@ -3873,7 +3896,7 @@ static proc list2intvec(list l)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-// Given two intvecs, both ordered for lowest to highest, it return
+// Given two intvecs, both ordered from lowest to highest, it return
 // a new intvec containing the union of both intvecs, ordered from lowest
 // to highest.
 static proc appendIntvecs(intvec a, intvec b)
@@ -3882,7 +3905,7 @@ static proc appendIntvecs(intvec a, intvec b)
   int indA = 1;
   int indB = 1;
   int indC = 1;
-  int last = -1;
+  int last = -10; // Change this 
   while((indA <= size(a)) and (indB <= size(b)))
   {
     if(a[indA] < b[indB]){
@@ -4301,7 +4324,10 @@ proc henselBlocks(poly f, int globOrder, int loc)
 
   intvec vx = (1,0);
   intvec vy = (0,1);
-  int maxOrder = deg(f, vx);
+  int maxOrder = deg(f, vx);  // This is not enough, we need to use the max degree of the products of the singular parts of the expansions.
+                              // This is equal to the sum of the x-degrees of the exponents of the expansions.
+                              
+
     
   if(globOrder > maxOrder)
   {
@@ -5219,21 +5245,44 @@ static proc sameClass(list l1, list l2, int offset)
   return(same);
 }
 
+// Computes the total sum of the x-degrees of the expansions
+// ZZZZZZZZZZZZZZZZZZZZZ
+proc totalDegreePE(classes)
+{
+  int i;
+  
+  int degXClass;
+  int degXTotal;
+  intvec vx = (1,0);
+  
+  def R = basering;
+  def S;
+  
+  for(i = 1; i <= size(classes); i++)
+  {
+    // If there is only one expansion in the class, there is nothing to do
+    if(typeof(classes[i][1]) == "ring")
+    {
+      S = classes[i][1];
+      setring S;
 
-// proc checkClass(list expClass)
-// {
-//     // If there is only one expansion in the class, there is nothing to do
-//     if(typeof(expClass[1]) == "ring")
-//     {
-//       for(j = 1; j <= size(classes[i]); j++)
-//       {
-//         if(typeof(classes[i][j]) == "ring")
-//         {
-//           S = classes[i][j];
-//           setring S;
-//           if(typeof(PE[1][7])!= "none")
-//           {
-//
+      "PE[1][1] = ", PE[1][1];
+
+      degXClass = deg(PE[1][1], vx);
+      "x-degree = ", degXClass;
+      
+      setring R;
+    } else
+    {
+      degXClass = deg(classes[i][1][1], vx);
+      "x-degree = ", degXClass;
+    }
+    degXTotal = degXTotal + degXClass;
+  }
+  return(degXTotal);
+}
+
+
 
 ///////////////////////////////////////////////////////////////////////////////
 // Copied from classify.lib
