@@ -137,3 +137,5 @@ helpfiles
 .coverage
 *.pyc
 Singular/LIB/.singularhistory
+Singular/LIB/MapleInterface.lib
+Singular/LIB/ibDebTools.lib

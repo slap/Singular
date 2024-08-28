@@ -1248,7 +1248,6 @@ static proc ibAt0(poly f, int locBasis, int optimize, int intExp)
       }
     }
 
-
     debug_log_intbas(3, "------Time for factors info: ", timer - tt);
     
   } 
