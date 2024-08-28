@@ -73,6 +73,9 @@ proc integralBasis(poly f, int intVar, list #)
         ideal inputC. This option is only for use in other procedures. Using
         this option, the result might not be the integral basis. (When this
         option is given, the global option will be used.)@*
+        - list(\"intExp\", int intExp) -> when the integrality exponent is known
+        it can be set using this option, this can speed up the computations
+        by truncating the polynomials at low degrees.
         - \"locBasis\" -> when computing the integral basis at a prime or
         primary component, it computes a local basis, that is, a basis that is
         integral only over the ring localized at the component. This option
@@ -119,6 +122,8 @@ EXAMPLE: example integralBasis; shows an example
   {
     modular = 0;
   }
+  
+  int intExp = -1; // Integrality exponent. When set to -1 it will be computed by the procedure.
 
   int useRotation = 0;
   int checkIrred = 1;   // Checks if the input polynomial is irreducible
@@ -210,10 +215,7 @@ EXAMPLE: example integralBasis; shows an example
             }
           }
         }
-      }
-      if (#[i][1]=="inputC")
-      {
-        if(size(#[i]) == 2)
+        if (#[i][1]=="inputC")
         {
           if((typeof(#[i][2]) == "ideal") or (typeof(#[i][2]) == "poly"))
           {
@@ -233,6 +235,13 @@ EXAMPLE: example integralBasis; shows an example
                 dbprint(dbg, "Ideal C read from the input parameters.");
               }
             }
+          }
+        }
+        if (#[i][1]=="intExp")
+        {
+          if(typeof(#[i][2]) == "int")
+          {
+            intExp = #[i][2];
           }
         }
       }
@@ -305,7 +314,7 @@ EXAMPLE: example integralBasis; shows an example
 //--------------------- computing the integral basis --------------------------
   dbprint(dbg, "Computing the integral basis...");
 
-  list ib = integralBasisMain(f, strategy, algorithm, modular, compType, compo, locBasis, useRotation, optimize);  
+  list ib = integralBasisMain(f, strategy, algorithm, modular, compType, compo, locBasis, useRotation, optimize, intExp);  
   ideal num = ib[1];
   poly den = ib[2];
   dbprint(dbg, "Integral basis computation finished.");
@@ -337,7 +346,7 @@ example
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static proc integralBasisMain(poly f, string strategy, string algorithm, int modular, string compType, ideal compo, int locBasis, int useRotation, int optimize)
+static proc integralBasisMain(poly f, string strategy, string algorithm, int modular, string compType, ideal compo, int locBasis, int useRotation, int optimize, int intExp)
 // Computes the integral basis of R/<f>.
 // The integral variable is always the second variable.
 {
@@ -409,7 +418,7 @@ static proc integralBasisMain(poly f, string strategy, string algorithm, int mod
     } else
     {
       // Computes the integral basis at the component via puiseux expansions
-      ib = ibLocal(f, compo, locBasis, useRotation, optimize);
+      ib = ibLocal(f, compo, locBasis, useRotation, optimize, intExp);
       normalGen = ib[1];
       D = ib[2];
     }
@@ -420,7 +429,7 @@ static proc integralBasisMain(poly f, string strategy, string algorithm, int mod
       // Computes the integral basis my glueing together the local
       // contrubutions
       //"_DEBUG_ integralLocal";
-      ib = integralLocal(I, modular, algorithm, useRotation, optimize, opts);
+      ib = integralLocal(I, modular, algorithm, useRotation, optimize, intExp, opts);
       normalGen = ib[1];
       D = ib[2];  // The universal denominator
       norToInt = ib[3];
@@ -478,7 +487,7 @@ static proc integralBasisMain(poly f, string strategy, string algorithm, int mod
 // the singular locus.
 // The main procedure for the computation of the local approach is ibLocal
 
-static proc integralLocal(ideal I, int modular, string algorithm, int useRotation, int optimize, list #)
+static proc integralLocal(ideal I, int modular, string algorithm, int useRotation, int optimize, int intExp, list #)
 {
   int i, ii;
   int dbg = printlevel - voice + 4;
@@ -590,7 +599,7 @@ static proc integralLocal(ideal I, int modular, string algorithm, int useRotatio
     dbprint(dbg, "----Component: ");
     if(dbg>=1){compo;}
   
-    norOut = intBasisComp(f, compType, compo, algorithm, locBasis, useRotation, optimize, #);
+    norOut = intBasisComp(f, compType, compo, algorithm, locBasis, useRotation, optimize, intExp, #);
     norT = norOut[1];
     denomT = norOut[2];
     // If the denominator is not a polynomial in x we change it.
@@ -702,7 +711,7 @@ static proc integralLocal(ideal I, int modular, string algorithm, int useRotatio
 ///////////////////////////////////////////////////////////////////////////////
 
 // Integral basis localized at a component.
-static proc intBasisComp(poly f, string compType, ideal compo, string algorithm, int locBasis, int useRotation, int optimize, list #)
+static proc intBasisComp(poly f, string compType, ideal compo, string algorithm, int locBasis, int useRotation, int optimize, int intExp, list #)
 {
   int dbg = printlevel - voice + 4;
   int good = 0;
@@ -712,7 +721,7 @@ static proc intBasisComp(poly f, string compType, ideal compo, string algorithm,
 
   // If algorithm == "hensel", we use the new algorithm.
   if(algorithm == "hensel"){
-    nor = ibLocal(f, compo, locBasis, useRotation, optimize);
+    nor = ibLocal(f, compo, locBasis, useRotation, optimize, intExp);
     if(size(nor) != 0){
       norT = nor[1];
       denomT = nor[2];
@@ -941,7 +950,7 @@ static proc normToInt(poly f, ideal normalGen, poly D, int needGroeb)
 // If locBasis = 1, it doesnt take into account the the unit from f
 // after localization
 
-static proc ibLocal(poly f, ideal P, int locBasis, int useRotation, int optimize){
+static proc ibLocal(poly f, ideal P, int locBasis, int useRotation, int optimize, int intExp){
   int dbg = printlevel - voice + 2;
   P  = groebner(P);
   if(dbg - 1 > 0)
@@ -1096,11 +1105,8 @@ static proc ibLocal(poly f, ideal P, int locBasis, int useRotation, int optimize
       fT = f;
     }
 
-    ideal ibN = ibAt0(fT, locBasis, optimize);
-
-    // After ibAt0
-    //"ibN = "; ibN;
-    //~;
+    // The main procedure for computing the integral basis at the origin
+    ideal ibN = ibAt0(fT, locBasis, optimize, intExp);   
 
     if(size(ibN) == 0){
       return(list());
@@ -1127,7 +1133,7 @@ static proc ibLocal(poly f, ideal P, int locBasis, int useRotation, int optimize
 // It uses the algorithm by Boehm, Decker, Laplagne, Pfister.
 // If locBasis = 1, it doesnt take into account the the unit from f
 // after localization
-static proc ibAt0(poly f, int locBasis, int optimize)
+static proc ibAt0(poly f, int locBasis, int optimize, int intExp)
 {
   int t;
   int dbg = printlevel - voice + 4;
@@ -1155,86 +1161,115 @@ static proc ibAt0(poly f, int locBasis, int optimize)
   tt = timer;
   // Starting exponents and minimal polynomials of the Puiseux expansions
 
-  // Puiseux expansions at the origin
-  dbprint(dbg, "--Computing Puiseux expansions at the origin...");
-  // puiseux(poly f, int maxDeg, int atOrigin)
-  list l = puiseux(f, -1, 1);
-  //"puiseux expansion: ", l;
-  //~;
-  debug_log_intbas(3, "------Time puiseux expansions: ", timer - tt);
-  tt = timer;
-  int totDeg = getTotalDeg(l);
-  list classes = getClasses(l);
-//  "getClasses";
-//  ~;
-//  //if(dbg > 5)
-//  //{
-//    "Puiseux branches: "; classes;
-//    ~;
-//  //}
 
 
-  // We compute the building blocks of the basis elements
-  dbprint(dbg, "--Building factors of different degrees...");
-  list bF = buildFactors(classes);
-  debug_log_intbas(3, "------Time for the factors: ", timer - tt);
-  tt = timer;
-  list slopes = getSlopes(classes);
-  intvec md = getDegs(classes);
-  // Tables of vanishing order of diferences of puiseux expansions
-  dbprint(dbg, "--Computing vanishing orders...");
-  matrix M = valIK(classes);
-  list vS = valIKSelf(bF, md);
+  // This part is only used to compute the integrality exponent.
+  // So if the integrality exponent is given, we can skip this.
+  // This is useful if we can first truncate to obtain the
+  // integrality exponent quickly
   
-//  "valIKSelf";
-//  vS;
-//  ~;
-  
-  list MSelf = vS[1];
-
-  list bestElem = vS[2];
-
-  // The highest exponent of the denominator
-  if(size(classes) > 1)
-  {
-    b = ibElement(M, MSelf, d0 - 1, md);
-    number maxExp = b[1];
-    intvec elem = b[2];
-  } else
-  {
-    if(d0 > 1)
-    {
-      number maxExp = MSelf[1][size(MSelf[1])];
-      intvec elem = d0-1;
-    } else {
-      // This should never happen, unless we have a non-singular point?
-      number maxExp = 0;
-      intvec elem = 0;
-    }
+  int useIntExp;
+  if(intExp >= 0) {
+    "The integrality exponent is set to ", intExp;
+    useIntExp = 1;
+  } else {
+    "The integrality will be calculated from the Puiseux expansions.";
+    useIntExp = 0;
   }
 
 
-  debug_log_intbas(3, "------Time for factors info: ", timer - tt);
+  int computeBlocks;  
+  list l; // Puiseux expansions
+  int totDeg;
+  list classes;
+  list bF;
+  list slopes;
+  intvec md;
+  matrix M;
+  list vS;
+  
+  list MSelf;
+  list bestElem;
+  number maxExp;
+  intvec elem;
+  
+  if(useIntExp == 1)
+  {
+    maxExp = intExp; // This should be given by the user;
+    computeBlocks = 1;
+  } else {
+    // Puiseux expansions at the origin
+    dbprint(dbg, "--Computing Puiseux expansions at the origin...");
+    // puiseux(poly f, int maxDeg, int atOrigin)
+    l = puiseux(f, -1, 1);
+    //"puiseux expansion: ", l;
+    //~;
+    debug_log_intbas(3, "------Time puiseux expansions: ", timer - tt);
+    tt = timer;
+    totDeg = getTotalDeg(l);
+    classes = getClasses(l);
+    
+    if(size(classes) > 1) {
+      computeBlocks = 1;
+    }
+
+
+    // We compute the building blocks of the basis elements
+    dbprint(dbg, "--Building factors of different degrees...");
+    bF = buildFactors(classes);
+    debug_log_intbas(3, "------Time for the factors: ", timer - tt);
+    tt = timer;
+    slopes = getSlopes(classes);
+    md = getDegs(classes);
+    // Tables of vanishing order of diferences of puiseux expansions
+    dbprint(dbg, "--Computing vanishing orders...");
+    M = valIK(classes);
+    vS = valIKSelf(bF, md);
+    
+    MSelf = vS[1];
+    bestElem = vS[2];
+
+    // The highest exponent of the denominator
+    if(size(classes) > 1)
+    {
+      b = ibElement(M, MSelf, d0 - 1, md);
+      maxExp = b[1];
+      elem = b[2];
+    } else
+    {
+      if(d0 > 1)
+      {
+        maxExp = MSelf[1][size(MSelf[1])];
+        elem = d0-1;
+      } else {
+        // This should never happen, unless we have a non-singular point?
+        maxExp = 0;
+        elem = 0;
+      }
+    }
+
+
+    debug_log_intbas(3, "------Time for factors info: ", timer - tt);
+    
+  } 
   tt = timer;
   dbprint(dbg, "--Building HenselBlocks...");
-  int degExpand = int(maxExp) + 1;
+  
+  // By Proposition 23 from Computing Puiseux Series..., it is enough to develope up to degree 2 * integrality exponent.
+  int degExpand = 2 * int(maxExp) + 1;
   dbprint(dbg, "---- Degree of expansions: ", degExpand);
 
   // We develope up to the total x-degree of the product of the Puiseux expansions, so that we dont loose information!
   // TO DO: compute the hensel blocks from the expansions, dont recompute the expansions from the blocks.
-  int maxOrderPE = totalDegreePE(classes);
+  //int maxOrderPE = totalDegreePE(classes);
   
-  "maxOrderPE = ", maxOrderPE;
-  "degExpand = ", degExpand;
-  
-  if(maxOrderPE + 1> degExpand)
-  {
-    degExpand = maxOrderPE + 1;
-  }
-  
-  // NOOO!!
-  degExpand = degExpand + 10;
-
+//  "maxOrderPE = ", maxOrderPE;
+//  "degExpand = ", degExpand;
+//  
+//  if(maxOrderPE + 1> degExpand)
+//  {
+//    degExpand = maxOrderPE + 1;
+//  }
 
   // Computing hensel blocks...
   list I2Lifted = henselBlocks(f, degExpand, 1);
@@ -1246,6 +1281,8 @@ static proc ibAt0(poly f, int locBasis, int optimize)
 //  list classesOld = classes;
 //  ~;
 
+
+
 ////////////////////////////////////////////////////////////////////////
 // RECOMPUTE CLASSES USING HENSEL BLOCKS
 // SO THAT THEY ARE COMPUTED IN THE SAME ORDER
@@ -1255,7 +1292,9 @@ static proc ibAt0(poly f, int locBasis, int optimize)
 
 //  if((size(classes) > 1) && (1==0))
   list blocks;  // Indicates to which block belongs each class of expansions
-  if((size(classes) > 1))
+  //if((size(classes) > 1))
+  
+  if(computeBlocks == 1)
   {
     list classesNew;
     list classesTemp;
@@ -1290,14 +1329,9 @@ static proc ibAt0(poly f, int locBasis, int optimize)
     // Tables of vanishing order of diferences of puiseux expansions
     dbprint(dbg, "Computing vanishing orders...");
     M = valIK(classes);
-//    "M = ", M;
-//    ~;
 
     vS = valIKSelf(bF, md);
     MSelf = vS[1];
-    
-    //"MSelf 2 = ", MSelf;
-    //~;
 
     bestElem = vS[2];
 
@@ -1310,18 +1344,14 @@ static proc ibAt0(poly f, int locBasis, int optimize)
   }
 // RECOMPUTATION FINISHED
 ///////////////////////////////////////////////////////////////////////
-  //dbprint(dbg, "Output of Hensel Blocks: ");
-  //dbprint(dbg, I2Lifted);
-  
-//  "Classes after recomputation...";
-//  classes;
-//  ~;
   
   int cl;
   int nClasses;
   nClasses = size(classes);
+
   // ordsFull gives the order of each polynomial in I2Lifted at the other conjugacy classes.
   matrix ordsFull[size(I2Lifted) -1][nClasses];
+
   for(i = 1; i <= size(I2Lifted) - 1; i++)
   {
     for(cl = 1; cl <= nClasses; cl++)
@@ -3783,7 +3813,7 @@ static proc intBasIdealToList(ideal I)
 
 // Divides f by the maximum possible power of g.
 // Returns the quotient and the exponent used of g.
-static proc divideBy(poly f, poly g)
+proc divideBy(poly f, poly g)
 "USAGE:  divideBy(f,g); f, g multivariate polynomials
 RETURN:  a list of two elements. The first element is the polynomial f
 divided by the maximum possible power of g and the second element is an
@@ -4307,7 +4337,7 @@ proc henselBlocks(poly f, int globOrder, int loc)
 
   //if(dbg > 5)
   //{
-  //  "---- henselBlock begins";
+  //  "---- henselBlock begins - globOrder = ", globOrder;
   //}
   
   poly x = var(1);
@@ -4421,6 +4451,7 @@ static proc henselInSegment(poly f, int globOrder)
   //{
   //  "START - hensel.lib - henselSegments - 1";  
   //}
+    
   int i, j;
   int loc;
   list comps;
@@ -4432,6 +4463,8 @@ static proc henselInSegment(poly f, int globOrder)
   int d = deg(f, vy);
 
   list l = newtonpoly(f);
+  
+  //"l = ", l;
   
   int slN = l[2][1] - l[1][1];
   int slD = l[1][2] - l[2][2];
@@ -4487,6 +4520,7 @@ static proc henselInSegment(poly f, int globOrder)
       comp++;
     }
   }
+  //"comps = ", reduce(comps[1], groebner(x15));
   return(comps);
 }
 
