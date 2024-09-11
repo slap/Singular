@@ -1627,19 +1627,6 @@ static proc ibAt0(poly f, int locBasis, int optimize, int intExp)
       // Optimization using factors over the ground field
       list IOutComplete = optimAlgorithmBlocks(n, locBasis, d0, d1, classes, unitLifted, factorsAtOriginLifted, optimize, bF, blocks);
       IOut = IOutComplete[1];
-      
-//      "IOut: "; IOut;
-//      ~;
-      
-//      "Orders: "; IOutComplete[2];
-//      "Polys: "; IOut;
-//      
-//      "Compare with local";
-//      locBasis = 1;
-//      list IOutCompleteLoc = optimAlgorithmBlocks(n, locBasis, d0, d1, vxy, M, MSelf, md, classes, unitLifted, factorsAtOriginLifted, ordsFull, bestElem, optimize, bF, blocks);
-////      IOutCompleteLoc;
-////      ~;
-//      locBasis = 0;
     }
   }
   return(IOut);
@@ -2158,6 +2145,7 @@ proc buildFactors(list classes)
             }
           }
         }
+        "call 1";
         polyGround = buildPolyGround(fFrac, den);
         fGround = squarefree(polyGround[1]);
         if (polyGround[2] == 0)
@@ -2344,6 +2332,8 @@ proc buildPolyFrac(poly f)
 //         The common denominator is now cancelled with the numerators.
 static proc buildPolyGround(list fFrac, int sD)
 {
+  "fFrac = "; fFrac;
+  "sD = ", sD;
   int i;
   int gfCheck = 1;  // The polynomial computed is over the ground field.
                     // This means the conjugacy  is computed correctly.
@@ -3371,13 +3361,13 @@ static proc irreducibleFactors(poly f, list classes, list blocks, int degExpand)
               fuProd = fuProd * fu;
             } else
             {
-
-
               fuProd = fuProd * (var(2) - classes2[j][cl][1]);
-
+              PEPE = classes2[j][cl][2];
             }
           }
-
+          
+          "call 2";
+          ~;
           bPG = buildPolyGround(fuProd, PEPE);
           if(bPG[2] == 0)
           {

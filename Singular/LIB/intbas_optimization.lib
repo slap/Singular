@@ -357,11 +357,6 @@ proc optiBest(matrix M, list MSelf, intvec md, int k)
 // I2LiftedFull are the factors corresponding to the classes in the block, numbered starting from 1
 proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, poly unitLiftedFull, list I2LiftedFull, int optimize, list bF, list blocks)
 {
-  
-//  "CLASSES"; 
-//  classes;
-//  ~;
-  
   // We create the list of polynomials and their degrees
   int i, j, k;
   int new;
@@ -380,6 +375,9 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
   list polys_maxPow;
   
   list bElem;
+  
+  "Original factors: ", I2LiftedFull;
+  
   
   // We construct all the polynomials that can be used as factors of the integral elements
   
@@ -400,7 +398,7 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
     {
       new = 1;
       maxPow = deg(I2LiftedFull[i], vy) div polys_deg[ind];  // The number of factors that can appear in the factorization contributed by the corresponding class.
-                                                               // Probably we can use this number - 1
+                                                             // Probably we can use this number - 1
       for(k = 1; k <= size(polys); k++)
       {
         if((reduce(polys[k], bF[1][i][j]) == 0) && (reduce(bF[1][i][j], polys[k]) == 0))
@@ -420,22 +418,10 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
     }
   }
   
+  
   int s = size(classes);
   int sC = size(polys);
-  number order(1..s);
-
-//  "classes";
-//  classes;
-//
-//  "polys";
-//  polys;
-//  
-//  "polys_deg";
-//  polys_deg;
-//  
-//  "polys_maxPow";
-//  polys_maxPow;
-  
+  number order(1..s); 
 
   list bElems;
   intvec elem;
@@ -449,10 +435,19 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
     for(k = 1; k <= sC; k++)   // Polynomials
     {
       ordPolAtClass[k,j] = number(Integralbasis::ordAtPol(polys[k], classes[j][1]));
-      //"jsdkf";
-      //ordPolAtClass[k,j] = tt;
     }
   }
+  
+  "polys";
+  polys;
+  
+  "classes"; 
+  classes;
+  
+  
+  "ordPolAtClass";
+  ordPolAtClass;
+  
   
   int dd;
   for(dd = 1; dd < d0; dd++)
@@ -474,10 +469,6 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
           {
             if(sums[i][k] > 0)
             {
-//              "i, j, k", i, j, k;
-//              sums[i];
-//              polys[k];
-//              classes[j];
               if(polys_class[k] == j)
               {
                 order(j) = -1; // When the full lifted factor is used, the valuation at an expansion of the same class is infinity.
@@ -555,12 +546,6 @@ proc optimAlgorithmBlocks(int n, int locBasis, int d0, int d1, list classes, pol
       elemOrd[k+d1+1] = maxExp;
     }
   }
-
-//  "basis";
-//  ibNum;
-//  ibDen;
-//  //bElem;
-//  ~;
 
   ideal IOut;
   if(locBasis == 1)
