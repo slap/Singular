@@ -22,12 +22,8 @@ J. Boehm, M.S. Marais, G. Pfister: Classification of Complex Singularities with 
 
 J. Boehm, M.S. Marais, G. Pfister: Moduli Parameters of Complex Singularities with Non-Degenerate Newton Boundary, https://arxiv.org/abs/2402.05093
 
-Acknowledgements: This research was supported by
-the Staff Exchange Bursary Programme of the University of Pretoria, DFG SPP 1489,
-DFG TRR 195. The financial assistance of the National Research Foundation (NRF),
-South Africa, towards this research is hereby acknowledged. Opinions expressed
-and conclusions arrived at are those of the author and are not necessarily to be
-attributed to the National Research Foundation, South Africa.
+Acknowledgements: This research was supported by the Rubbi fund of the Department of Mathematical Sciences of Stellenbosch University, DFG SPP 1489,@* 
+DFG TRR 195 (Project B5).
 
 KEYWORDS: polynomials
 
@@ -53,8 +49,8 @@ static proc mod_init()
 {
   newstruct("Poly","ring in,poly value");
   newstruct("NormalFormEquation","list vars, string singularityType, int milnorNumber, Poly normalFormEquation, int modality, list parameters, int corank, int inertiaIndex, int determinacy, int realCase");
-  newstruct("RightEquivalenceChainWithPrecision","Poly sourcegerm, Poly targetgerm, list transformations, int precision");
-  newstruct("NormalForm","int numbervars, ring inputRing, Poly nondegeneratePart, Poly nonNormalizedNNBGerm, Poly normalizedNNBGerm, string singularityType, int milnorNumber, Poly normalForm, RightEquivalenceChainWithPrecision phi, RightEquivalenceChainWithPrecision phiBeforeMorseSplit,  Poly normalFormEquation,Poly nonNormalizedNormalFormEquation, int modality, list parameters, int corank, int inertiaIndex, int determinacy, int realCase, int delta, int numberOfBranches, Poly extension1, Poly extension2");
+  newstruct("RightEquivalenceChainWithPrecision","Poly sourcegerm, Poly targetgerm, list transformations, int precision, int HC");
+  newstruct("NormalForm","int numbervars, ring inputRing, Poly nondegeneratePart, Poly nonNormalizedNNBGerm, Poly normalizedNNBGerm, string singularityType, int milnorNumber, Poly normalForm, RightEquivalenceChainWithPrecision phi, RightEquivalenceChainWithPrecision phiBeforeMorseSplit,  Poly normalFormEquation,Poly nonNormalizedNormalFormEquation, int modality, list parameters, int corank, int determinacy, int delta, int numberOfBranches, Poly extension1, Poly extension2, Poly exceptionalHypersurface");
   newstruct("PolynomialRightEquivalence","ring in, list images, list imagesInverse");
   system("install","Poly","print",printPoly,1);
   system("install","Poly","string",stringPoly,4);
@@ -150,10 +146,20 @@ def TT=P.in;
 setring TT;
 "Embedding dimension = "+string(F.numbervars);
 "Corank of singularity = "+string(F.corank);
-if (F.realCase){"Inertia index = "+string(F.inertiaIndex);}
 "Normalform of type = "+(F.singularityType);
 "Normalform = "
 +string(P.value);
+Poly EH = F.exceptionalHypersurface;
+def REH = EH.in;
+setring REH;
+if(EH.value<>-1)
+{
+  "Polynomial defining Exceptional Hypersurface = "+string(EH.value);
+}
+else
+{
+  "Exceptional Hypersurface is not determined.";
+}
 Poly G = F.normalFormEquation;
 def RR = G.in;
 setring RR;
@@ -166,33 +172,26 @@ else
 Poly H = F.extension1;
 def RRR = H.in;
 setring RRR;
-if(H.value<>0){"Polynomial of ring extension ="+string(H.value);}
+if(H.value<>0){"Polynomial defining ring extension ="+string(H.value);}
 Poly HH = F.extension2;
 def RRRR = HH.in;
 setring RRRR;
-if(HH.value<>0){"Polynomial of ring extension ="+string(HH.value);}
+if(HH.value<>0){"Polynomial defining ring extension ="+string(HH.value);}
 setring TT;
 "Milnor number = "+string(F.milnorNumber);
 "Modality = "+string(F.modality);
 if (F.modality>=1){
   if (F.modality==1){
-    setring R;
-      "Monomials corresponding to moduli terms = "+string(F.parameters[1][1]);
-    setring TT;
+      "Monomials corresponding to moduli terms = "+string(F.parameters[1]);
   } else {
-    setring R;
       string paraterms="Monomials corresponding to moduli terms = ";
       for (int i =1;i<=size(F.parameters);i++){
-          paraterms=paraterms+string(F.parameters[i][1]);
+          paraterms=paraterms+string(F.parameters[i]);
           if (i<size(F.parameters)){paraterms = paraterms +", ";}
       }
       paraterms;
-      setring TT;
   }
-  if (F.realCase && minpoly!=0){
-      if (F.modality>1){ERROR("Not implemented");}
-      "Interval = ["+string(F.parameters[1][2][1])+", "+string(F.parameters[1][2][2])+"]";
-  }
+  setring TT;
 }
 "Delta invariant = "+string(F.delta);
 "Number of branches = "+string(F.numberOfBranches);
