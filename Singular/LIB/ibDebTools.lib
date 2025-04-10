@@ -1,0 +1,438 @@
+///////////////////////////////////////////////////////////////////////////////
+version="$Id$";
+category="Commutative Algebra";
+info="
+LIBRARY:  ibDebTools.lib
+
+PURPOSE:  Tools for computing integral basis
+
+AUTHORS:  J. Boehm, j.boehm@mx.uni-saarland.de @*
+          W. Decker, decker@mathematik.uni-kl.de> @*
+          S. Laplagne, slaplagn@dm.uba.ar @*
+          F. Seelisch, seelisch@mathematik.uni-kl.de
+";
+
+LIB "MapleInterface.lib";
+LIB "integralbasis.lib";
+LIB "atkins.lib"; // used for square root, can we get rid of this?
+//LIB "random.lib";
+//LIB "sing.lib";
+
+proc ibComp(poly f, list #){
+  system("--ticks-per-sec", 100);
+  int t = timer;
+  list options;
+  int hMet = 1;   // Singular kernel hensel lifting
+
+  "Options available: ";
+  "  atOrigin - integral basis at the origin";
+  "  modular - use modular algorithms (default)";
+  "  nonModular - do not use modular algorithms";
+  "  singular - run only Singular";
+  "  maple - run only Maple";
+
+  "Selected options: ";
+  if(optionOn(#, "atOrigin"))
+  {
+    "  atOrigin - integral basis at the origin";
+    options = list("atOrigin");
+  } else
+  {
+    "  full integral basis";
+    "  No special algorithm for the nodal locus.";
+    options = list("simple");
+  }
+
+  if(optionOn(#, "nonModular"))
+  {
+    "  nonModular - do not use modular algorithms";
+    options = insert(options, "nonModular");
+  } else
+  {
+    "  modular - use modular algorithms";
+    options = insert(options, "modular");
+  }
+  if(optionOn(#, "normal"))
+  {
+    "  normal algorithm";
+    options = insert(options, "normal");
+  }   
+  
+  if(optionOn(#, "locLoc"))
+  {
+    "  locLoc algorithm";
+    options = insert(options, "locLoc");
+  }   
+  if(optionOn(#, "noOpti"))
+  {
+    "  not optimal algorithm (option used only for debug)";
+    options = insert(options, "noOpti");
+  } 
+  "---";
+
+  if(optionOn(#, "maple") == 0)
+  { 
+    list ib = integralBasis(f, 2, options);
+
+    int t1 = timer - t;
+    if(hMet == 2)
+    {
+      "Time Singular Library: ", t1, "/ 100 seg";
+    } else
+    {
+      "Time Singular Kernel: ", t1, "/ 100 seg";
+    }
+  }
+  if(optionOn(#, "singular") == 0)
+  {
+    if(optionOn(#, "atOrigin"))
+    {
+      list l = locIntegralBasisFromMaple(f);
+    } else
+    {
+      list l = integralBasisFromMaple(f) ;
+    }
+  }
+  if(optionOn(#, "maple") == 0)
+  {
+    "Time Singular: ", t1, "/ 100 seg";
+  }
+  if(optionOn(#, "singular") == 0)
+  {
+    "Time Maple: ", l[3], "seg";
+  }
+  if(optionOn(#, "singular") == 1)
+  {
+    return(ib);
+  }
+  if(optionOn(#, "maple") == 1)
+  {
+    return(l);
+  }
+
+  if((optionOn(#, "maple") == 0) and (optionOn(#, "singular") == 0))
+  {
+    "Comparing outputs...";
+    int s1 = (size(reduce(ib[1], groebner(l[1]))) == 0);
+    s1;
+    if(s1 == 0){
+      "Different output! Check...";
+      reduce(ib[1], groebner(l[1]));
+      ~;
+    }
+    int s2 = (size(reduce(l[1], groebner(ib[1]))) == 0);
+    s2;
+    if(s2 == 0){
+      "Different output! Check...";
+      reduce(l[1], groebner(ib[1]));
+      ~;
+    }
+    "Same output?", s1 * s2;
+    return(l);
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+proc ibCompNormal(poly f, list #){
+  int hMet = 2;
+  list options;
+  "Options: ";
+
+  if(optionOn(#, "atOrigin"))
+  {
+    "Integral basis at the origin.";
+    options = list("atOrigin");
+  } else
+  {
+    "Full integral basis.";
+    options = list("simple");
+    "No special algorithm for the nodal case.";
+  }
+
+  ideal I = f;
+  list optN = insert(options, "normal");
+
+  int t = timer;
+  list ib1 = integralBasis(f, 2, optN);
+  int t1 = timer - t;
+  "Time Normal: ", t1;
+
+  int t2 = timer;
+  list ib2 = integralBasis(f, 2, options);
+
+  "Time IntegralBasis: ", timer - t2;
+
+  "Comparing outputs...";
+  ideal nor = changeDenominator(ib1[1], ib1[2], ib2[2], f);
+  int s1 = (size(reduce(ib2[1], groebner(nor))) == 0);
+  s1;
+  int s2 = (size(reduce(nor, groebner(ib2[1]))) == 0);
+  s2;
+  "Same output?", s1 * s2;
+  if(s1 * s2 == 0){
+    "Different output! Check...";
+    ~;
+  }
+  return(ib1);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+
+
+
+// NOT WORKING!
+proc moduleReduction(ideal remi, poly mp, poly target)
+{
+  //"START - ibtools.lib - moduleReduction";
+  // Basering = 0, (a,x,y), lp;
+  def R = basering;
+  int i, j;
+  intvec vy = (0,0,1);
+  int n = deg(target, vy);
+
+  matrix vecs[n + 1][ncols(remi)+n+1];
+  matrix coeffi[n + 1][2];
+
+  coeffi = coeffs(target, var(3));
+  for(j = 1; j<=nrows(coeffi); j++)
+  {
+    vecs[n+2-j, 1] = coeffi[j, 1];
+  }
+
+
+  for(i = 1; i<= ncols(remi); i++){
+    coeffi = coeffs(remi[i], var(3));
+    for(j = 1; j<=nrows(coeffi); j++)
+    {
+      vecs[n+2-j, 1 + i] = coeffi[j, 1];
+    }
+    //vecs[1..nrows(coeffi), i] = coeffi[1..nrows(coeffi), 1];
+  }
+  for(i = 2; i<= n+1; i++){
+    vecs[i, 1 + ncols(remi) + (i-1)] = mp;
+  }
+
+  module M = vecs;
+  print(M);
+  ~;
+  ring S = 0, (a,x), (C, lp);
+  module M = imap(R, M);
+  //dbprint(dbg - 1, "----Triangulating...");
+  M = std(M);
+  ~;
+  setring R;
+  M = imap(S, M);
+  poly g = 0;
+  for(j = 0; j <= n; j++){
+    g = g + M[1][j+1] * var(3)^j;
+  }
+  return(g)
+}
+
+
+
+
+
+proc ibDebug(poly f, list #){
+  //"START - ibtools.lib - ibDebug";
+  int t;
+  int i, j;
+  list options;
+  int hMet = 1;   // Singular kernel hensel lifting
+  list algos;
+  list times;
+  
+  "Algorithms available: ";
+  "  std - standard algorithm";
+  "  noOpti - Traditional algorithm, no optimization";
+  "  locLoc - locLoc algorithm";
+  "  maple - test in maple";
+  "Additional options for all algorithms: ";
+  "  atOrigin - integral basis at the origin";
+  "  modular - use modular algorithms (default)";
+  "  nonModular - do not use modular algorithms";
+  
+  "Selected options: ";
+  if(optionOn(#, "atOrigin"))
+  {
+    "  atOrigin - integral basis at the origin";
+    options = list("atOrigin");
+  } else
+  {
+    "  full integral basis";
+    "  No special algorithm for the nodal locus.";
+    options = list("simple");
+  }
+
+  if(optionOn(#, "nonModular"))
+  {
+    "  nonModular - do not use modular algorithms";
+    options = insert(options, "nonModular");
+  } else
+  {
+    "  modular - use modular algorithms";
+    options = insert(options, "modular");
+  }
+  "---";
+  "";
+  
+  list optAlgo;
+  list outs;
+  i = 1;
+  if(optionOn(#, "locLoc"))
+  {
+    t = timer;
+    "Option ", i, ": locLoc algorithm";
+    optAlgo = insert(options, "locLoc");
+    outs[i] = integralBasis(f, 2, optAlgo);
+    "    Time: ", timer - t;
+    algos[i] = "locLoc";
+    times[i] = timer - t;
+    i++;
+    
+  }   
+  if(optionOn(#, "noOpti"))
+  {
+    t = timer;
+    "Option ", i, ": not optimal algorithm (option used only for debug)";
+    optAlgo = insert(options, "noOpti");
+    outs[i] = integralBasis(f, 2, optAlgo);
+    "  Time: ", timer - t;
+    algos[i] = "noOpti";
+    times[i] = timer - t;
+    i++;
+  } 
+  if(optionOn(#, "std"))
+  {
+    t = timer;
+    "Option ", i, ": standard algorithm";
+    optAlgo = options;
+    outs[i] = integralBasis(f, 2, optAlgo);
+    "  Time: ", timer - t;
+    algos[i] = "std   ";
+    times[i] = timer - t;
+    i++;
+  } 
+  if(optionOn(#, "maple") == 1)
+  {
+    t = timer;
+    "Option ", i, ": maple";
+    if(optionOn(#, "atOrigin"))
+    {
+      outs[i] = locIntegralBasisFromMaple(f);
+    } else
+    {
+      outs[i] = integralBasisFromMaple(f) ;
+    }
+    "  Time: ", timer - t;
+    algos[i] = "maple ";
+    times[i] = timer - t;
+    i++;
+  }
+  "---";
+
+  for(j = 1; j <= size(outs); j++)
+  {
+    outs[j][1] = groebner(outs[j][1]);
+  }
+  // Comparison
+  int s1, s2;
+  if(size(outs) > 1)
+  {
+    "Comparing outputs...";
+    for(j = 1; j < size(outs); j++)
+    {
+      s1 = (size(reduce(outs[j][1], outs[j+1][1])) == 0);
+      if(s1 == 0){
+        "Different output! Check...";
+        reduce(outs[j][1], outs[j+1][1]);
+        ~;
+      }
+      s2 = (size(reduce(outs[j+1][1], outs[j][1])) == 0);
+      if(s2 == 0){
+        "Different output! Check...";
+        reduce(outs[j+1][1], outs[j][1]);
+        ~;
+      }
+      "Out ", algos[j], " against out ", algos[j+1], ": Same output?", s1 * s2;
+    }
+  }
+  for(j = 1; j <= size(outs); j++)
+  {
+    "Time " + algos[j] + ": ", times[j];
+  }
+  return(outs[1]);
+}
+
+
+proc normalComp(ideal IOut1, ideal IOut2, poly f)
+{
+  poly den1 = IOut1[1];
+  poly den2 = IOut2[1];
+  
+  poly den = lcm(den1, den2);
+  IOut1 = IOut1 * (den / den1);
+  IOut2 = IOut2 * (den / den2);
+  
+  ideal I1f = IOut1, f;
+  ideal I2f = IOut2, f;
+  "IOut1 c IOut2: ", size(reduce(IOut1, groebner(I2f))) == 0;
+  "IOut2 c IOut1: ", size(reduce(IOut2, groebner(I1f))) == 0;
+  
+  return(0);
+}
+
+  
+  
+
+//////////////////////////////////////////////////////////////////////////////
+
+// Generates a polynomial of degree d with a ordinary multiple point at
+// the origin of order k and computes the singular locus of it.
+// This is used to test the algorithms for groebner bases and associated
+// primes of zero-dimensional ideals.
+// The only associated prime is (or should be) <x, y>.
+
+// You can enter an option third parameter of type int to be used as
+// random seed.
+static proc singDK(int d, int k, list #){
+  //"START - ibtools.lib - singDK";
+  poly f = polyDK(d, k, #);
+  ideal J = minor(jacob(f), 1, f);
+  J = J, f;
+  return(J);
+}
+
+// Authomatic test for ordinary multiple points.
+// Generates a random polynomial and tests the integral basis algorithms.
+proc multOrd(int d, int k){
+  //"START - ibtools.lib - multOrd";
+// Returns 1 if the integral basis is correct, or 0 otherwise.
+// d = degree in y
+// k = order of the singularity at the origin
+// d >= k
+  ring r = 0, (x,y), dp;
+  poly f = polyDK(d, k);
+  return(ibCompare(f,d,k));
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// Checks opt appears in the list opts.
+static proc optionOn(list opts, def opt)
+{
+  int i;
+  for(i = 1; i <= size(opts); i++)
+  {
+    if(typeof(opts[i]) == typeof(opt))
+    {
+      if(opts[i] == opt)
+      {
+        return(1);
+      }
+    }
+  }
+  return(0);
+}

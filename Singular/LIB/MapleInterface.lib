@@ -1,0 +1,209 @@
+///////////////////////////////////////////////////////////////////////////////
+/////////////////////////////// GENERIC CODE //////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+proc getNewFileName(int length)
+{
+  string s = "abcdefghijklmnopqrstuvwxyz";
+  string t;
+  string result; link l;
+  int i; int exists = 1;
+  while (exists == 1)
+  {
+    result = "";
+    for (i = 1; i <= length; i++)
+    {
+      t = s[random(1, 26)];
+      result = result + t;
+    }
+    l = ":w " + result;
+    exists = (status(l, "exists") == "yes");
+  }
+  return (result);
+}
+
+proc writeMapleInputFile(string inFileName, list mapleCodeLines,
+                         list outVariables, string outFileName,
+                         string singularListName)
+{
+  link l = ":w " + inFileName;
+  open(l);
+  int i;
+  for (i = 1; i <= size(mapleCodeLines); i++) { write(l, mapleCodeLines[i]); }
+  string p = "\""; string s;
+  s = "open(" + p + outFileName + p + ", WRITE):";
+  write(l, s);
+  s = "fprintf(";
+  s = s + p + outFileName + p + ", ";
+  s = s + p + "%s" + p + ", ";
+  s = s + p + "list " + singularListName + " =\\n" + p + "):";
+  write(l, s);
+  for (i = 1; i <= size(outVariables); i++)
+  {
+    s = "fprintf(";
+    s = s + p + outFileName + p + ", ";
+    s = s + p + "%s";
+    if (i < size(outVariables)) { s = s + ",\\n"; }
+    s = s + p + ", ";
+    s = s + "convert(" + outVariables[i] + ", string)";
+    s = s + "):";
+    write(l, s);
+  }
+  s = "fprintf(";
+  s = s + p + outFileName + p + ", ";
+  s = s + p + "%s" + p + ", ";
+  s = s + p + ";" + p + "):";
+  write(l, s);
+  s = "close(" + p + outFileName + p + "):";
+  write(l, s);
+  close(l);
+}
+
+proc runMapleCode(string mapleInputFile)
+{
+  string p = "\"";
+  int errorCode = system("sh", "maple " + p + mapleInputFile + p);
+  if (errorCode != 0)
+  { "ERROR: could not run Maple with input file " + p + mapleInputFile + p; }
+}
+
+proc getMapleResult(string mapleOutputFile)
+{
+  link l = ":r " + mapleOutputFile;
+  open(l);
+  string s = read(l);
+  close(l);
+  return (s);
+}
+
+proc deleteFile(string fileName)
+{
+  link l = ":w " + fileName;
+  if (status(l, "exists") == "yes")
+  {
+    int errorCode = system("sh", "rm " + fileName);
+    string p = "\"";
+    if (errorCode != 0)
+    { "ERROR: could not remove file " + p + fileName + p; }
+  }
+}
+
+///////////////////////////////////////////////////////////////////////////////
+/////////////////////////// NON-GENERIC CODE //////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+proc locIntegralBasisFromMaple(poly f)
+{
+  int oldShort = short; short = 0;
+  string fIn  = getNewFileName(8);
+  string fOut = getNewFileName(8);
+  list mapleCode;
+  mapleCode[ 1] = "with(algcurves, integral_basis);";
+  mapleCode[ 2] = "memused := kernelopts(bytesused);";
+  mapleCode[ 3] = "memalloc := kernelopts(bytesalloc);";
+  mapleCode[ 4] = "theTime := time[real]();";
+  mapleCode[ 5] = "intBasis := integral_basis(" + string(f) + ", "
+                  + string(var(1)) + ", " + string(var(2)) + ", {"
+                  + string(var(1)) + "});";
+  mapleCode[ 6] = "theTime := time[real]() - theTime;";
+  mapleCode[ 7] = "d := lcm(op(map(denom, intBasis)));";
+  mapleCode[ 8] = "intBasis := expand(d * intBasis);";
+  mapleCode[ 9] = "intBasisString := convert(intBasis, string);";
+  mapleCode[10] = "s1 := intBasisString[2..length(intBasisString)-1];";
+  mapleCode[11] = "s1 := cat(\"list(\", s1, \")\");";
+  mapleCode[12] = "s2 := cat(\"\\\"\", convert(theTime, string), \"\\\"\");";
+  mapleCode[13] = "memused := kernelopts(bytesused) - memused;";
+  mapleCode[14] = "memalloc := kernelopts(bytesalloc) - memalloc;";
+  //mapleCode;
+  list L;
+  L[1] = "s1";        /* the integral basis with denominators cleared */
+  L[2] = "d";         /* lcm of denominators */
+  L[3] = "s2";        /* time consumption by Maple in seconds */
+  L[4] = "memused";   /* bytes used (end - start) by Maple */
+  L[5] = "memalloc";  /* bytes allocated (end - start) by Maple */
+  writeMapleInputFile(fIn, mapleCode, L, fOut, "MAPLE_RESULT");
+  runMapleCode(fIn);
+  execute(getMapleResult(fOut));
+  deleteFile(fIn);
+  deleteFile(fOut);
+  short = oldShort;
+  list l1 = MAPLE_RESULT[1];
+  ideal I1 = l1[1..size(l1)];
+  MAPLE_RESULT[1] = I1;
+  return (MAPLE_RESULT);
+}
+
+proc integralBasisFromMaple(poly f)
+{
+  int oldShort = short; short = 0;
+  string fIn  = getNewFileName(8);
+  string fOut = getNewFileName(8);
+  list mapleCode;
+  mapleCode[ 1] = "with(algcurves, integral_basis):";
+  mapleCode[ 2] = "memused := kernelopts(bytesused):";
+  mapleCode[ 3] = "memalloc := kernelopts(bytesalloc):";
+  mapleCode[ 4] = "theTime := time[real]():";
+  mapleCode[ 5] = "intBasis := integral_basis(" + string(f) + ", "
+                  + string(var(1)) + ", " + string(var(2)) + "):";
+  mapleCode[ 6] = "theTime := time[real]() - theTime:";
+  mapleCode[ 7] = "d := lcm(op(map(denom, intBasis))):";
+  mapleCode[ 8] = "intBasis := simplify(expand(d * normal(intBasis))):";
+  mapleCode[ 9] = "intBasisString := convert(intBasis, string):";
+  mapleCode[10] = "s1 := intBasisString[2..length(intBasisString)-1]:";
+  mapleCode[11] = "s1 := cat(\"list(\", s1, \")\"):";
+  mapleCode[12] = "s2 := cat(\"\\\"\", convert(theTime, string), \"\\\"\"):";
+  mapleCode[13] = "memused := kernelopts(bytesused) - memused:";
+  mapleCode[14] = "memalloc := kernelopts(bytesalloc) - memalloc:";
+  //mapleCode;
+  list L;
+  L[1] = "s1";        /* the integral basis with denominators cleared */
+  L[2] = "d";         /* lcm of denominators */
+  L[3] = "s2";        /* time consumption by Maple in seconds */
+  L[4] = "memused";   /* bytes used (end - start) by Maple */
+  L[5] = "memalloc";  /* bytes allocated (end - start) by Maple */
+  writeMapleInputFile(fIn, mapleCode, L, fOut, "MAPLE_RESULT");
+  runMapleCode(fIn);
+  execute(getMapleResult(fOut));
+  deleteFile(fIn);
+  deleteFile(fOut);
+  short = oldShort;
+  list l1 = MAPLE_RESULT[1];
+  ideal I1 = l1[1..size(l1)];
+  MAPLE_RESULT[1] = I1;
+  return (MAPLE_RESULT);
+}
+
+proc parametrizationFromMaple(poly f, poly paramVariable)
+{
+  int oldShort = short; short = 0;
+  poly g = subst(f, var(3), 1);
+  string fIn  = getNewFileName(8);
+  string fOut = getNewFileName(8);
+  list mapleCode;
+  mapleCode[ 1] = "with(algcurves, parametrization);";
+  mapleCode[ 2] = "memused := kernelopts(bytesused);";
+  mapleCode[ 3] = "memalloc := kernelopts(bytesalloc);";
+  mapleCode[ 4] = "theTime := time[real]();";
+  mapleCode[ 5] = "param := parametrization(" + string(g) + ", "
+                  + string(var(1)) + ", " + string(var(2)) + ", "
+                  + string(paramVariable) + ");";
+  mapleCode[ 6] = "theTime := time[real]() - theTime;";
+  mapleCode[ 7] = "paramString := convert(param, string);";
+  mapleCode[ 8] = "s1 := paramString[2..length(paramString)-1];";
+  mapleCode[ 9] = "s1 := cat(\"list(\", s1, \")\");";
+  mapleCode[10] = "s2 := cat(\"\\\"\", convert(theTime, string), \"\\\"\");";
+  mapleCode[11] = "memused := kernelopts(bytesused) - memused;";
+  mapleCode[12] = "memalloc := kernelopts(bytesalloc) - memalloc;";
+  list L;
+  L[1] = "s1";
+  L[2] = "s2";
+  L[3] = "memused";
+  L[4] = "memalloc";
+  writeMapleInputFile(fIn, mapleCode, L, fOut, "MAPLE_RESULT");
+  runMapleCode(fIn);
+  execute(getMapleResult(fOut));
+  deleteFile(fIn);
+  deleteFile(fOut);
+  short = oldShort;
+  return (MAPLE_RESULT);
+}
