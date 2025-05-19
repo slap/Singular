@@ -1270,9 +1270,9 @@ proc getSegments(poly f, list classes, list slopes, int globOrder)
   {
     list comps;
     int comp;
-    poly f0 = subst(f, x, 0);
-    list fl = divideBy(f0, y);
-    list fGlob = henselGlobal(y^fl[2], fl[1], f, maxOrder);
+    poly f0 = subst(f, var(1), 0);
+    list fl = divideBy(f0, var(2));
+    list fGlob = henselGlobal(var(2)^fl[2], fl[1], f, maxOrder);
     poly fLoc = fGlob[1];
 
     if(fLoc == 1)
@@ -4411,7 +4411,7 @@ static proc newtonInfo(poly f, int b){
     {
       if((slN mod slD) == 0)
       {
-        return(list("changeCoord", subst(sqpp, y, 0)*x^(slN div slD)));
+        return(list("changeCoord", subst(sqpp, var(2), 0)*var(1)^(slN div slD)));
       } else
       {
         ERROR("Not implemented.");
